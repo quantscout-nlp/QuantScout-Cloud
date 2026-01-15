@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-QuantScout PRO TERMINAL (v5.2 - DEBUG & DIAGNOSTIC)
+QuantScout PRO TERMINAL (v5.1 - CLOUD WITH SLEEP MODE)
 """
 import streamlit as st
 import pandas as pd
@@ -9,30 +9,17 @@ import time
 import yfinance as yf
 from GoogleNews import GoogleNews
 from datetime import datetime
-import pytz 
+import pytz # For Time Zone Awareness
 from typing import Any, Dict, Optional
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="QuantScout Cloud", layout="wide", page_icon="🦅")
 
-# --- DEBUG: DIAGNOSTIC HEADER ---
-st.title("🦅 QuantScout Cloud Engine")
-
-# This block will print what keys are actually loaded
-found_keys = [k for k in st.secrets.keys()]
-if not found_keys:
-    st.error("❌ DIAGNOSTIC: Streamlit reports ZERO secrets found.")
-    st.info("💡 Tip: Try deleting this app on Streamlit and redeploying it.")
-else:
-    st.success(f"✅ DIAGNOSTIC: Found {len(found_keys)} keys: {found_keys}")
-
 # --- SECRETS MANAGER ---
 def get_secret(key_name):
-    # Direct dictionary access is more reliable than 'in' check sometimes
-    try:
+    if key_name in st.secrets:
         return st.secrets[key_name]
-    except:
-        return ""
+    return ""
 
 # =========================
 # LOAD KEYS
@@ -46,7 +33,7 @@ TG_ID = get_secret("TG_ID")
 
 # --- UTILS ---
 SESSION = requests.Session()
-SESSION.headers.update({"user-agent": "QuantScoutCloud/5.2"})
+SESSION.headers.update({"user-agent": "QuantScoutCloud/5.1"})
 
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -65,12 +52,24 @@ def http_get_json(url: str, headers: Optional[Dict]=None, params: Optional[Dict]
     except Exception as e:
         return 0, None, str(e)[:200]
 
-# --- SMART ALERTS ---
+# --- NEW: SMART ALERTS ---
 def send_telegram_alert_smart(message, token, chat_id):
     if not token or not chat_id: return
-    est = pytz.timezone('US/Eastern')
-    now = datetime.now(est)
-    if now.hour >= 23 or now.hour < 7: return 
+
+    # 1. Define Time Zone (US/Eastern)
+    try:
+        est = pytz.timezone('US/Eastern')
+        now = datetime.now(est)
+    except:
+        now = datetime.now() # Fallback if pytz fails
+
+    # 2. Quiet Hours Check (11 PM to 7 AM)
+    # If hour is 23 (11pm) or anything less than 7 (0-6am)
+    if now.hour >= 23 or now.hour < 7:
+        # DO NOT SEND MESSAGE
+        return 
+
+    # 3. Send Message (Only during day)
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try: requests.post(url, json={"chat_id": chat_id, "text": message}, timeout=3)
     except: pass
@@ -142,12 +141,13 @@ def fetch_news_hybrid(symbol, t_key):
     return 0.0, "No Data"
 
 # --- UI ---
+st.title("🦅 QuantScout Cloud Engine")
+
 with st.sidebar:
     st.header("⚙️ Settings")
     
-    # Debug check in sidebar
     if not ALPACA_ID:
-        st.warning("⚠️ Secrets failed to load.")
+        st.warning("⚠️ No Secrets Found. Enter Keys Manually.")
         alpaca_id = st.text_input("Alpaca ID", type="password")
         alpaca_secret = st.text_input("Alpaca Secret", type="password")
         polygon_key = st.text_input("Polygon Key", type="password")
@@ -188,6 +188,8 @@ if st.session_state.get('running', False):
                     elif rsi < 35: decision, conf = "BUY", 0.5
 
                 if decision != "HOLD":
+                    # 1. SEND TRADE SIGNAL (Always happens)
+                    # 2. SEND TELEGRAM (Only happens during day - Smart Check)
                     alert_key = f"{sym}_{decision}_{datetime.now().strftime('%H:%M')}"
                     if alert_key not in st.session_state:
                         msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f}\n{headline}"
