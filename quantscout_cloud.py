@@ -1,0 +1,209 @@
+# -*- coding: utf-8 -*-
+"""
+QuantScout PRO TERMINAL (v5.1 - CLOUD WITH SLEEP MODE)
+"""
+import streamlit as st
+import pandas as pd
+import requests
+import time
+import yfinance as yf
+from GoogleNews import GoogleNews
+from datetime import datetime
+import pytz # NEW: For Time Zone Awareness
+from typing import Any, Dict, Optional
+
+# --- PAGE CONFIG ---
+st.set_page_config(page_title="QuantScout Cloud", layout="wide", page_icon="🦅")
+
+# --- SECRETS MANAGER ---
+def get_secret(key_name):
+    if key_name in st.secrets:
+        return st.secrets[key_name]
+    return ""
+
+# =========================
+# LOAD KEYS
+# =========================
+ALPACA_ID = get_secret("AKMQPW0T4F3BMRVA25VB")
+ALPACA_SECRET = get_secret("QPSlZIJcV0S8vwc7GWB45Vorz527M5rEjhpzb4qi")
+POLYGON_KEY = get_secret("WPJc08p6Nqp39W05pBkNY6685DL2cqlc")
+TIINGO_KEY = get_secret("bf96558968e66c6dbfa2d914b0370212b2b8a771")
+TG_TOKEN = get_secret("8585376142:AAFSk6JwHDtzCqYUvLRPCxm1N3_VZJHjdIw")
+TG_ID = get_secret("8079429250")
+
+# --- UTILS ---
+SESSION = requests.Session()
+SESSION.headers.update({"user-agent": "QuantScoutCloud/5.1"})
+
+try:
+    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+except ImportError:
+    SentimentIntensityAnalyzer = None
+
+def to_float(x: Any) -> Optional[float]:
+    try: return float(x) if x is not None else None
+    except: return None
+
+def http_get_json(url: str, headers: Optional[Dict]=None, params: Optional[Dict]=None):
+    try:
+        r = SESSION.get(url, headers=headers, params=params, timeout=5.0)
+        if r.status_code >= 400: return r.status_code, None, r.text[:200]
+        return r.status_code, r.json(), ""
+    except Exception as e:
+        return 0, None, str(e)[:200]
+
+# --- NEW: SMART ALERTS ---
+def send_telegram_alert_smart(message, token, chat_id):
+    if not token or not chat_id: return
+
+    # 1. Define Time Zone (US/Eastern)
+    est = pytz.timezone('US/Eastern')
+    now = datetime.now(est)
+
+    # 2. Quiet Hours Check (11 PM to 7 AM)
+    # If hour is 23 (11pm) or anything less than 7 (0-6am)
+    if now.hour >= 23 or now.hour < 7:
+        # DO NOT SEND MESSAGE
+        return 
+
+    # 3. Send Message (Only during day)
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try: requests.post(url, json={"chat_id": chat_id, "text": message}, timeout=3)
+    except: pass
+
+# --- FETCHERS ---
+def fetch_alpaca_price(symbol, kid, sec):
+    if not kid or not sec: return None, "No Keys"
+    h = {"APCA-API-KEY-ID": kid, "APCA-API-SECRET-KEY": sec}
+    sc, j, e = http_get_json(f"https://data.alpaca.markets/v2/stocks/{symbol}/trades/latest", headers=h)
+    if j and isinstance(j, dict) and "trade" in j and j["trade"]: 
+        return to_float(j["trade"]["p"]), "Alpaca"
+    return None, e
+
+def fetch_polygon_price(symbol, key):
+    if not key: return None, "No Key"
+    sc, j, e = http_get_json(f"https://api.polygon.io/v2/last/trade/{symbol}", params={"apiKey": key})
+    if j and isinstance(j, dict) and "results" in j and j["results"]: 
+        return to_float(j["results"]["p"]), "Polygon"
+    return None, e
+
+@st.cache_data(ttl=60)
+def fetch_indicators_hybrid(symbol, kid, sec):
+    rsi, sma20 = 0.0, 0.0
+    # 1. Try Alpaca
+    if kid and sec:
+        h = {"APCA-API-KEY-ID": kid, "APCA-API-SECRET-KEY": sec}
+        params = {"timeframe": "1Day", "limit": 50, "feed": "iex"} 
+        sc, j, e = http_get_json(f"https://data.alpaca.markets/v2/stocks/{symbol}/bars", headers=h, params=params)
+        if j and isinstance(j, dict) and "bars" in j and j["bars"]:
+            bars = j["bars"]
+            if len(bars) > 20:
+                closes = pd.Series([b["c"] for b in bars])
+                delta = closes.diff()
+                up, down = delta.clip(lower=0), -delta.clip(upper=0)
+                rs = up.ewm(alpha=1/14).mean() / down.ewm(alpha=1/14).mean()
+                rsi = 100 - (100/(1+rs)).iloc[-1]
+                sma20 = closes.rolling(20).mean().iloc[-1]
+                return float(sma20), float(rsi), ""
+    # 2. Fallback Yahoo
+    try:
+        hist = yf.Ticker(symbol).history(period="3mo")
+        if not hist.empty and len(hist) > 20:
+            closes = hist["Close"]
+            delta = closes.diff()
+            up, down = delta.clip(lower=0), -delta.clip(upper=0)
+            rs = up.ewm(alpha=1/14).mean() / down.ewm(alpha=1/14).mean()
+            rsi = 100 - (100/(1+rs)).iloc[-1]
+            sma20 = closes.rolling(20).mean().iloc[-1]
+            return float(sma20), float(rsi), ""
+    except: pass
+    return 0.0, 0.0, "No Data"
+
+def fetch_news_hybrid(symbol, t_key):
+    if not SentimentIntensityAnalyzer: return 0.0, "VADER Missing"
+    analyzer = SentimentIntensityAnalyzer()
+    if t_key:
+        sc, j, e = http_get_json("https://api.tiingo.com/tiingo/news", params={"tickers":symbol,"limit":1,"token":t_key})
+        if j and isinstance(j, list) and len(j) > 0:
+            title = j[0].get("title", "")
+            return analyzer.polarity_scores(title).get("compound", 0.0), f"[Tiingo] {title}"
+    try:
+        goog = GoogleNews(lang='en', period='1d')
+        goog.search(f"{symbol} stock news")
+        results = goog.result()
+        if results and len(results) > 0:
+            title = results[0].get("title", "")
+            return analyzer.polarity_scores(title).get("compound", 0.0), f"[Google] {title}"
+    except: pass
+    return 0.0, "No Data"
+
+# --- UI ---
+st.title("🦅 QuantScout Cloud Engine")
+
+with st.sidebar:
+    st.header("⚙️ Settings")
+    
+    if not ALPACA_ID:
+        st.warning("⚠️ No Secrets Found. Enter Keys Manually.")
+        alpaca_id = st.text_input("Alpaca ID", type="password")
+        alpaca_secret = st.text_input("Alpaca Secret", type="password")
+        polygon_key = st.text_input("Polygon Key", type="password")
+        tiingo_key = st.text_input("Tiingo Key", type="password")
+        tg_token = st.text_input("Telegram Token", type="password")
+        tg_id = st.text_input("Telegram ID", type="password")
+    else:
+        st.success("🔒 Keys Loaded from Cloud Vault")
+        alpaca_id, alpaca_secret = ALPACA_ID, ALPACA_SECRET
+        polygon_key, tiingo_key = POLYGON_KEY, TIINGO_KEY
+        tg_token, tg_id = TG_TOKEN, TG_ID
+
+    default_tickers = "TSLA, SNOW, DUOL, ORCL, RDDT, PLTR, CRWV, VST, AMD, AMAT, LYFT, SMCI, LEU, OKLO, OPEN, QS, MU, CRWD, LUNR, SOC, RKLB, ARM, HOOD, COIN, SHOP, SOFI, UBER, DASH, CCJ, TEM, RGTI, IBIT, MRVL, INTC, RIVN, MU, TSM, WULF, ASM, MRVL, HPE, SMR, UEC, FIG, NXE"
+    tickers_txt = st.text_area("Watchlist", value=default_tickers, height=300)
+
+    if st.button("🚀 LAUNCH CLOUD SCANNER"):
+        st.session_state['running'] = True
+    
+    if st.button("🔴 STOP"):
+        st.session_state['running'] = False
+
+if st.session_state.get('running', False):
+    tickers = [t.strip().upper() for t in tickers_txt.split(",") if t.strip()]
+    rows = []
+    
+    with st.spinner(f"Scanning {len(tickers)} tickers..."):
+        for sym in tickers:
+            try:
+                price, src = fetch_alpaca_price(sym, alpaca_id, alpaca_secret)
+                if not price: price, src = fetch_polygon_price(sym, polygon_key)
+                sma20, rsi, err = fetch_indicators_hybrid(sym, alpaca_id, alpaca_secret)
+                sent, headline = fetch_news_hybrid(sym, tiingo_key)
+                
+                decision, conf = "HOLD", 0.0
+                if price and rsi > 0:
+                    if price > sma20 and rsi < 70 and sent > 0.15: decision, conf = "BUY", 0.8 + (sent * 0.1)
+                    elif price < sma20 and rsi > 30 and sent < -0.2: decision, conf = "SELL", 0.8
+                    elif rsi < 35: decision, conf = "BUY", 0.5
+
+                if decision != "HOLD":
+                    # 1. SEND TRADE SIGNAL (Always happens)
+                    # (Code for cloud bridge push is implied here if you add the file, 
+                    # otherwise it just tracks visually)
+                    
+                    # 2. SEND TELEGRAM (Only happens during day)
+                    alert_key = f"{sym}_{decision}_{datetime.now().strftime('%H:%M')}"
+                    if alert_key not in st.session_state:
+                        msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f}\n{headline}"
+                        send_telegram_alert_smart(msg, tg_token, tg_id) # Uses Smart Time Check
+                        st.session_state[alert_key] = True
+
+                rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "NEWS": headline})
+            except: pass
+
+    if rows:
+        df = pd.DataFrame(rows)
+        def color_signal(val):
+            return 'background-color: #1b4d3e' if val == 'BUY' else 'background-color: #4d1b1b' if val == 'SELL' else ''
+        st.dataframe(df.style.applymap(color_signal, subset=['SIGNAL']), use_container_width=True, height=600)
+
+    time.sleep(60)
+    st.rerun()

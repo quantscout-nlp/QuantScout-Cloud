@@ -1,0 +1,8 @@
+streamlit
+pandas
+requests
+vaderSentiment
+yfinance
+GoogleNews
+beautifulsoup4
+pytz
