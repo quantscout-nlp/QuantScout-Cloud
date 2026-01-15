@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-QuantScout PRO TERMINAL (v5.1 - CLOUD WITH SLEEP MODE)
+QuantScout PRO TERMINAL (v5.2 - DEBUG & DIAGNOSTIC)
 """
 import streamlit as st
 import pandas as pd
@@ -9,31 +9,44 @@ import time
 import yfinance as yf
 from GoogleNews import GoogleNews
 from datetime import datetime
-import pytz # NEW: For Time Zone Awareness
+import pytz 
 from typing import Any, Dict, Optional
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="QuantScout Cloud", layout="wide", page_icon="🦅")
 
+# --- DEBUG: DIAGNOSTIC HEADER ---
+st.title("🦅 QuantScout Cloud Engine")
+
+# This block will print what keys are actually loaded
+found_keys = [k for k in st.secrets.keys()]
+if not found_keys:
+    st.error("❌ DIAGNOSTIC: Streamlit reports ZERO secrets found.")
+    st.info("💡 Tip: Try deleting this app on Streamlit and redeploying it.")
+else:
+    st.success(f"✅ DIAGNOSTIC: Found {len(found_keys)} keys: {found_keys}")
+
 # --- SECRETS MANAGER ---
 def get_secret(key_name):
-    if key_name in st.secrets:
+    # Direct dictionary access is more reliable than 'in' check sometimes
+    try:
         return st.secrets[key_name]
-    return ""
+    except:
+        return ""
 
 # =========================
 # LOAD KEYS
 # =========================
-ALPACA_ID = get_secret("AKMQPW0T4F3BMRVA25VB")
-ALPACA_SECRET = get_secret("QPSlZIJcV0S8vwc7GWB45Vorz527M5rEjhpzb4qi")
-POLYGON_KEY = get_secret("WPJc08p6Nqp39W05pBkNY6685DL2cqlc")
-TIINGO_KEY = get_secret("bf96558968e66c6dbfa2d914b0370212b2b8a771")
-TG_TOKEN = get_secret("8585376142:AAFSk6JwHDtzCqYUvLRPCxm1N3_VZJHjdIw")
-TG_ID = get_secret("8079429250")
+ALPACA_ID = get_secret("ALPACA_ID")
+ALPACA_SECRET = get_secret("ALPACA_SECRET")
+POLYGON_KEY = get_secret("POLYGON_KEY")
+TIINGO_KEY = get_secret("TIINGO_KEY")
+TG_TOKEN = get_secret("TG_TOKEN")
+TG_ID = get_secret("TG_ID")
 
 # --- UTILS ---
 SESSION = requests.Session()
-SESSION.headers.update({"user-agent": "QuantScoutCloud/5.1"})
+SESSION.headers.update({"user-agent": "QuantScoutCloud/5.2"})
 
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -52,21 +65,12 @@ def http_get_json(url: str, headers: Optional[Dict]=None, params: Optional[Dict]
     except Exception as e:
         return 0, None, str(e)[:200]
 
-# --- NEW: SMART ALERTS ---
+# --- SMART ALERTS ---
 def send_telegram_alert_smart(message, token, chat_id):
     if not token or not chat_id: return
-
-    # 1. Define Time Zone (US/Eastern)
     est = pytz.timezone('US/Eastern')
     now = datetime.now(est)
-
-    # 2. Quiet Hours Check (11 PM to 7 AM)
-    # If hour is 23 (11pm) or anything less than 7 (0-6am)
-    if now.hour >= 23 or now.hour < 7:
-        # DO NOT SEND MESSAGE
-        return 
-
-    # 3. Send Message (Only during day)
+    if now.hour >= 23 or now.hour < 7: return 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try: requests.post(url, json={"chat_id": chat_id, "text": message}, timeout=3)
     except: pass
@@ -138,13 +142,12 @@ def fetch_news_hybrid(symbol, t_key):
     return 0.0, "No Data"
 
 # --- UI ---
-st.title("🦅 QuantScout Cloud Engine")
-
 with st.sidebar:
     st.header("⚙️ Settings")
     
+    # Debug check in sidebar
     if not ALPACA_ID:
-        st.warning("⚠️ No Secrets Found. Enter Keys Manually.")
+        st.warning("⚠️ Secrets failed to load.")
         alpaca_id = st.text_input("Alpaca ID", type="password")
         alpaca_secret = st.text_input("Alpaca Secret", type="password")
         polygon_key = st.text_input("Polygon Key", type="password")
@@ -185,15 +188,10 @@ if st.session_state.get('running', False):
                     elif rsi < 35: decision, conf = "BUY", 0.5
 
                 if decision != "HOLD":
-                    # 1. SEND TRADE SIGNAL (Always happens)
-                    # (Code for cloud bridge push is implied here if you add the file, 
-                    # otherwise it just tracks visually)
-                    
-                    # 2. SEND TELEGRAM (Only happens during day)
                     alert_key = f"{sym}_{decision}_{datetime.now().strftime('%H:%M')}"
                     if alert_key not in st.session_state:
                         msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f}\n{headline}"
-                        send_telegram_alert_smart(msg, tg_token, tg_id) # Uses Smart Time Check
+                        send_telegram_alert_smart(msg, tg_token, tg_id) 
                         st.session_state[alert_key] = True
 
                 rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "NEWS": headline})
