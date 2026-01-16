@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-QuantScout PRO TERMINAL (v5.3 - CLOUD HUD RESTORED)
+QuantScout PRO TERMINAL (v5.4 - AUTO-START / ALWAYS ON)
 """
 import streamlit as st
 import pandas as pd
@@ -33,7 +33,7 @@ TG_ID = get_secret("TG_ID")
 
 # --- UTILS ---
 SESSION = requests.Session()
-SESSION.headers.update({"user-agent": "QuantScoutCloud/5.3"})
+SESSION.headers.update({"user-agent": "QuantScoutCloud/5.4"})
 
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -137,7 +137,7 @@ def fetch_news_hybrid(symbol, t_key):
     return 0.0, "No Data"
 
 # --- UI ---
-st.title("🦅 QuantScout Cloud v5.3")
+st.title("🦅 QuantScout Cloud v5.4 (Auto-Pilot)")
 
 # Force Dark Mode Style for Metrics
 st.markdown("""
@@ -165,67 +165,63 @@ with st.sidebar:
     default_tickers = "TSLA, SNOW, DUOL, ORCL, RDDT, PLTR, CRWV, VST, AMD, AMAT, LYFT, SMCI, LEU, OKLO, OPEN, QS, MU, CRWD, LUNR, SOC, RKLB, ARM, HOOD, COIN, SHOP, SOFI, UBER, DASH, CCJ, TEM, RGTI, IBIT, MRVL, INTC, RIVN, MU, TSM, WULF, ASM, MRVL, HPE, SMR, UEC, FIG, NXE"
     tickers_txt = st.text_area("Watchlist", value=default_tickers, height=300)
 
-    if st.button("🚀 LAUNCH CLOUD SCANNER"):
-        st.session_state['running'] = True
+    # NO BUTTON - AUTO START LOGIC
+    st.info("System is Scanning (Auto-Pilot)")
+
+# --- MAIN LOOP (Always Runs) ---
+tickers = [t.strip().upper() for t in tickers_txt.split(",") if t.strip()]
+rows = []
+
+# Progress spinner
+with st.spinner(f"Scanning {len(tickers)} tickers..."):
+    for sym in tickers:
+        try:
+            price, src = fetch_alpaca_price(sym, alpaca_id, alpaca_secret)
+            if not price: price, src = fetch_polygon_price(sym, polygon_key)
+            sma20, rsi, err = fetch_indicators_hybrid(sym, alpaca_id, alpaca_secret)
+            sent, headline = fetch_news_hybrid(sym, tiingo_key)
+            
+            decision, conf = "HOLD", 0.0
+            if price and rsi > 0:
+                if price > sma20 and rsi < 70 and sent > 0.15: decision, conf = "BUY", 0.8 + (sent * 0.1)
+                elif price < sma20 and rsi > 30 and sent < -0.2: decision, conf = "SELL", 0.8
+                elif rsi < 35: decision, conf = "BUY", 0.5
+
+            if decision != "HOLD":
+                alert_key = f"{sym}_{decision}_{datetime.now().strftime('%H:%M')}"
+                if alert_key not in st.session_state:
+                    msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f}\n{headline}"
+                    send_telegram_alert_smart(msg, tg_token, tg_id) 
+                    st.session_state[alert_key] = True
+
+            rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "NEWS": headline})
+        except: pass
+
+# --- DISPLAY HUD ---
+if rows:
+    df = pd.DataFrame(rows)
     
-    if st.button("🔴 STOP"):
-        st.session_state['running'] = False
-
-if st.session_state.get('running', False):
-    tickers = [t.strip().upper() for t in tickers_txt.split(",") if t.strip()]
-    rows = []
+    buys = len(df[df["SIGNAL"] == "BUY"])
+    sells = len(df[df["SIGNAL"] == "SELL"])
+    avg_rsi = df["RSI"].mean() if "RSI" in df.columns else 0.0
     
-    # Progress spinner
-    with st.spinner(f"Scanning {len(tickers)} tickers..."):
-        for sym in tickers:
-            try:
-                price, src = fetch_alpaca_price(sym, alpaca_id, alpaca_secret)
-                if not price: price, src = fetch_polygon_price(sym, polygon_key)
-                sma20, rsi, err = fetch_indicators_hybrid(sym, alpaca_id, alpaca_secret)
-                sent, headline = fetch_news_hybrid(sym, tiingo_key)
-                
-                decision, conf = "HOLD", 0.0
-                if price and rsi > 0:
-                    if price > sma20 and rsi < 70 and sent > 0.15: decision, conf = "BUY", 0.8 + (sent * 0.1)
-                    elif price < sma20 and rsi > 30 and sent < -0.2: decision, conf = "SELL", 0.8
-                    elif rsi < 35: decision, conf = "BUY", 0.5
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Active Tickers", len(tickers))
+    m2.metric("Buy Signals", buys)
+    m3.metric("Sell Signals", sells)
+    m4.metric("Market RSI (Avg)", round(avg_rsi, 1))
+    
+    st.markdown("---")
 
-                if decision != "HOLD":
-                    alert_key = f"{sym}_{decision}_{datetime.now().strftime('%H:%M')}"
-                    if alert_key not in st.session_state:
-                        msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f}\n{headline}"
-                        send_telegram_alert_smart(msg, tg_token, tg_id) 
-                        st.session_state[alert_key] = True
+    def color_signal(val):
+        return 'background-color: #1b4d3e' if val == 'BUY' else 'background-color: #4d1b1b' if val == 'SELL' else ''
+    
+    st.dataframe(
+        df.style.applymap(color_signal, subset=['SIGNAL']), 
+        use_container_width=True, 
+        height=600
+    )
 
-                rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "NEWS": headline})
-            except: pass
-
-    # --- RESTORED HUD (METRICS) ---
-    if rows:
-        df = pd.DataFrame(rows)
-        
-        # Calculate Stats
-        buys = len(df[df["SIGNAL"] == "BUY"])
-        sells = len(df[df["SIGNAL"] == "SELL"])
-        avg_rsi = df["RSI"].mean() if "RSI" in df.columns else 0.0
-        
-        # Display the 4 Big Cards
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Active Tickers", len(tickers))
-        m2.metric("Buy Signals", buys)
-        m3.metric("Sell Signals", sells)
-        m4.metric("Market RSI (Avg)", round(avg_rsi, 1))
-        
-        st.markdown("---")
-
-        def color_signal(val):
-            return 'background-color: #1b4d3e' if val == 'BUY' else 'background-color: #4d1b1b' if val == 'SELL' else ''
-        
-        st.dataframe(
-            df.style.applymap(color_signal, subset=['SIGNAL']), 
-            use_container_width=True, 
-            height=600
-        )
-
-    time.sleep(60)
-    st.rerun()
+# --- AUTO REFRESH ---
+time.sleep(60)
+st.rerun()
