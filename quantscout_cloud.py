@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-QuantScout PRO TERMINAL (v5.2 - CLOUD STABLE)
+QuantScout PRO TERMINAL (v5.3 - CLOUD HUD RESTORED)
 """
 import streamlit as st
 import pandas as pd
@@ -33,7 +33,7 @@ TG_ID = get_secret("TG_ID")
 
 # --- UTILS ---
 SESSION = requests.Session()
-SESSION.headers.update({"user-agent": "QuantScoutCloud/5.2"})
+SESSION.headers.update({"user-agent": "QuantScoutCloud/5.3"})
 
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -137,7 +137,14 @@ def fetch_news_hybrid(symbol, t_key):
     return 0.0, "No Data"
 
 # --- UI ---
-st.title("🦅 QuantScout Cloud v5.2")
+st.title("🦅 QuantScout Cloud v5.3")
+
+# Force Dark Mode Style for Metrics
+st.markdown("""
+<style>
+    .stMetric { background-color: #0e1117; border: 1px solid #303030; padding: 10px; border-radius: 5px; }
+</style>
+""", unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("⚙️ Settings")
@@ -168,6 +175,7 @@ if st.session_state.get('running', False):
     tickers = [t.strip().upper() for t in tickers_txt.split(",") if t.strip()]
     rows = []
     
+    # Progress spinner
     with st.spinner(f"Scanning {len(tickers)} tickers..."):
         for sym in tickers:
             try:
@@ -192,11 +200,32 @@ if st.session_state.get('running', False):
                 rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "NEWS": headline})
             except: pass
 
+    # --- RESTORED HUD (METRICS) ---
     if rows:
         df = pd.DataFrame(rows)
+        
+        # Calculate Stats
+        buys = len(df[df["SIGNAL"] == "BUY"])
+        sells = len(df[df["SIGNAL"] == "SELL"])
+        avg_rsi = df["RSI"].mean() if "RSI" in df.columns else 0.0
+        
+        # Display the 4 Big Cards
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Active Tickers", len(tickers))
+        m2.metric("Buy Signals", buys)
+        m3.metric("Sell Signals", sells)
+        m4.metric("Market RSI (Avg)", round(avg_rsi, 1))
+        
+        st.markdown("---")
+
         def color_signal(val):
             return 'background-color: #1b4d3e' if val == 'BUY' else 'background-color: #4d1b1b' if val == 'SELL' else ''
-        st.dataframe(df.style.applymap(color_signal, subset=['SIGNAL']), use_container_width=True, height=600)
+        
+        st.dataframe(
+            df.style.applymap(color_signal, subset=['SIGNAL']), 
+            use_container_width=True, 
+            height=600
+        )
 
     time.sleep(60)
     st.rerun()
