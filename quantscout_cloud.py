@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-QuantScout PRO TERMINAL (v5.1 - CLOUD WITH SLEEP MODE)
+QuantScout PRO TERMINAL (v5.2 - CLOUD STABLE)
 """
 import streamlit as st
 import pandas as pd
@@ -9,7 +9,7 @@ import time
 import yfinance as yf
 from GoogleNews import GoogleNews
 from datetime import datetime
-import pytz # For Time Zone Awareness
+import pytz 
 from typing import Any, Dict, Optional
 
 # --- PAGE CONFIG ---
@@ -33,7 +33,7 @@ TG_ID = get_secret("TG_ID")
 
 # --- UTILS ---
 SESSION = requests.Session()
-SESSION.headers.update({"user-agent": "QuantScoutCloud/5.1"})
+SESSION.headers.update({"user-agent": "QuantScoutCloud/5.2"})
 
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -52,24 +52,22 @@ def http_get_json(url: str, headers: Optional[Dict]=None, params: Optional[Dict]
     except Exception as e:
         return 0, None, str(e)[:200]
 
-# --- NEW: SMART ALERTS ---
+# --- SMART ALERTS (DND PROTOCOL) ---
 def send_telegram_alert_smart(message, token, chat_id):
     if not token or not chat_id: return
 
-    # 1. Define Time Zone (US/Eastern)
+    # 1. Force US/Eastern Time
     try:
         est = pytz.timezone('US/Eastern')
         now = datetime.now(est)
     except:
-        now = datetime.now() # Fallback if pytz fails
+        now = datetime.now() 
 
-    # 2. Quiet Hours Check (11 PM to 7 AM)
-    # If hour is 23 (11pm) or anything less than 7 (0-6am)
+    # 2. Quiet Hours (11 PM - 7 AM EST)
     if now.hour >= 23 or now.hour < 7:
-        # DO NOT SEND MESSAGE
-        return 
+        return # Silence
 
-    # 3. Send Message (Only during day)
+    # 3. Send Message
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try: requests.post(url, json={"chat_id": chat_id, "text": message}, timeout=3)
     except: pass
@@ -93,7 +91,6 @@ def fetch_polygon_price(symbol, key):
 @st.cache_data(ttl=60)
 def fetch_indicators_hybrid(symbol, kid, sec):
     rsi, sma20 = 0.0, 0.0
-    # 1. Try Alpaca
     if kid and sec:
         h = {"APCA-API-KEY-ID": kid, "APCA-API-SECRET-KEY": sec}
         params = {"timeframe": "1Day", "limit": 50, "feed": "iex"} 
@@ -108,7 +105,6 @@ def fetch_indicators_hybrid(symbol, kid, sec):
                 rsi = 100 - (100/(1+rs)).iloc[-1]
                 sma20 = closes.rolling(20).mean().iloc[-1]
                 return float(sma20), float(rsi), ""
-    # 2. Fallback Yahoo
     try:
         hist = yf.Ticker(symbol).history(period="3mo")
         if not hist.empty and len(hist) > 20:
@@ -141,13 +137,12 @@ def fetch_news_hybrid(symbol, t_key):
     return 0.0, "No Data"
 
 # --- UI ---
-st.title("🦅 QuantScout Cloud Engine")
+st.title("🦅 QuantScout Cloud v5.2")
 
 with st.sidebar:
     st.header("⚙️ Settings")
-    
     if not ALPACA_ID:
-        st.warning("⚠️ No Secrets Found. Enter Keys Manually.")
+        st.warning("⚠️ Enter Keys Manually")
         alpaca_id = st.text_input("Alpaca ID", type="password")
         alpaca_secret = st.text_input("Alpaca Secret", type="password")
         polygon_key = st.text_input("Polygon Key", type="password")
@@ -155,7 +150,7 @@ with st.sidebar:
         tg_token = st.text_input("Telegram Token", type="password")
         tg_id = st.text_input("Telegram ID", type="password")
     else:
-        st.success("🔒 Keys Loaded from Cloud Vault")
+        st.success("🔒 Keys Loaded")
         alpaca_id, alpaca_secret = ALPACA_ID, ALPACA_SECRET
         polygon_key, tiingo_key = POLYGON_KEY, TIINGO_KEY
         tg_token, tg_id = TG_TOKEN, TG_ID
@@ -188,8 +183,6 @@ if st.session_state.get('running', False):
                     elif rsi < 35: decision, conf = "BUY", 0.5
 
                 if decision != "HOLD":
-                    # 1. SEND TRADE SIGNAL (Always happens)
-                    # 2. SEND TELEGRAM (Only happens during day - Smart Check)
                     alert_key = f"{sym}_{decision}_{datetime.now().strftime('%H:%M')}"
                     if alert_key not in st.session_state:
                         msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f}\n{headline}"
