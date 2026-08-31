@@ -6,6 +6,8 @@ import streamlit as st
 import pandas as pd
 import requests
 import yfinance as yf
+import json
+import base64
 from datetime import datetime, date
 import pytz
 from typing import Any, Dict, Optional
@@ -38,6 +40,7 @@ POLYGON_KEY = get_secret("POLYGON_KEY")
 TIINGO_KEY = get_secret("TIINGO_KEY")
 TG_TOKEN = get_secret("TG_TOKEN")
 TG_ID = get_secret("TG_ID")
+GITHUB_TOKEN = get_secret("GITHUB_TOKEN")
 
 # --- UTILS ---
 SESSION = requests.Session()
@@ -67,6 +70,108 @@ def http_post_json(url: str, headers: Optional[Dict]=None, json_body: Optional[D
         return r.status_code, r.json(), ""
     except Exception as e:
         return 0, None, str(e)[:200]
+
+def http_put_json(url: str, headers: Optional[Dict]=None, json_body: Optional[Dict]=None):
+    try:
+        r = SESSION.put(url, headers=headers, json=json_body, timeout=10.0)
+        if r.status_code >= 400: return r.status_code, None, r.text[:200]
+        return r.status_code, r.json(), ""
+    except Exception as e:
+        return 0, None, str(e)[:200]
+
+# =========================
+# 60-DAY TRIAL: GitHub-backed durable state (dry-run log + phase clock)
+# =========================
+# Streamlit's session_state and local disk don't survive a redeploy/restart, so the
+# trial's start date and its dry-run decision log are committed to a *separate* branch
+# of this repo (never `main`) — committing to main would trigger a Streamlit Cloud
+# redeploy on every log entry, restarting the app in a loop.
+GITHUB_API = "https://api.github.com"
+GITHUB_REPO = "quantscout-nlp/QuantScout-Cloud"
+TRIAL_BRANCH = "bot-trial-log"
+TRIAL_META_PATH = "trial_state/trial_meta.json"
+TRIAL_LOG_PATH = "trial_state/trial_log.jsonl"
+TRIAL_DRY_RUN_DAYS = 30
+TRIAL_PAPER_DAYS = 30
+
+def gh_headers():
+    return {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github+json"}
+
+def gh_get_branch_sha(branch):
+    sc, j, e = http_get_json(f"{GITHUB_API}/repos/{GITHUB_REPO}/git/ref/heads/{branch}", headers=gh_headers())
+    return j.get("object", {}).get("sha") if sc == 200 and j else None
+
+@st.cache_resource
+def gh_ensure_trial_branch():
+    if not GITHUB_TOKEN: return False
+    if gh_get_branch_sha(TRIAL_BRANCH): return True
+    base_sha = gh_get_branch_sha("main")
+    if not base_sha: return False
+    sc, j, e = http_post_json(f"{GITHUB_API}/repos/{GITHUB_REPO}/git/refs", headers=gh_headers(),
+                               json_body={"ref": f"refs/heads/{TRIAL_BRANCH}", "sha": base_sha})
+    return sc in (200, 201)
+
+def gh_get_file(path):
+    sc, j, e = http_get_json(f"{GITHUB_API}/repos/{GITHUB_REPO}/contents/{path}", headers=gh_headers(),
+                              params={"ref": TRIAL_BRANCH})
+    if sc == 200 and j and "content" in j:
+        return base64.b64decode(j["content"]).decode("utf-8"), j["sha"]
+    return None, None
+
+def gh_put_file(path, content_text, sha, message):
+    body = {
+        "message": message,
+        "content": base64.b64encode(content_text.encode("utf-8")).decode("ascii"),
+        "branch": TRIAL_BRANCH,
+    }
+    if sha: body["sha"] = sha
+    sc, j, e = http_put_json(f"{GITHUB_API}/repos/{GITHUB_REPO}/contents/{path}", headers=gh_headers(), json_body=body)
+    return sc in (200, 201), e
+
+@st.cache_resource
+def get_trial_start_date():
+    """Returns the trial's start date, bootstrapping it to today on first run ever.
+    Cached per-container-lifetime so this only hits the GitHub API once, not every pass."""
+    if not GITHUB_TOKEN: return None
+    gh_ensure_trial_branch()
+    content, _ = gh_get_file(TRIAL_META_PATH)
+    if content:
+        try:
+            return date.fromisoformat(json.loads(content)["start_date"])
+        except Exception:
+            pass
+    today = date.today()
+    gh_put_file(TRIAL_META_PATH, json.dumps({"start_date": today.isoformat()}), None,
+                "Init 60-day trial start date")
+    return today
+
+def get_trial_phase(start_date):
+    """DRY_RUN (days 0-29): signals computed and logged, no orders touch Alpaca at all.
+    PAPER (days 30-59): real orders against Alpaca's paper account (already-built path).
+    REVIEW (day 60+): frozen — no new positions opened; existing ones may still be
+    closed. Promotion to live trading is never automatic; it's a separate decision."""
+    if start_date is None: return "DRY_RUN", None
+    days = (date.today() - start_date).days
+    if days < TRIAL_DRY_RUN_DAYS: return "DRY_RUN", days
+    if days < TRIAL_DRY_RUN_DAYS + TRIAL_PAPER_DAYS: return "PAPER", days
+    return "REVIEW", days
+
+def derive_simulated_positions(existing_log_text):
+    """Replays the dry-run log to recover which symbols are 'simulated-held', since
+    dry-run trades never touch Alpaca's real (paper) position list."""
+    held = set()
+    if not existing_log_text: return held
+    for line in existing_log_text.splitlines():
+        line = line.strip()
+        if not line: continue
+        try:
+            row = json.loads(line)
+        except Exception:
+            continue
+        if row.get("mode") != "DRY_RUN": continue
+        if row.get("action") == "BUY": held.add(row.get("ticker"))
+        elif row.get("action") == "SELL": held.discard(row.get("ticker"))
+    return held
 
 # Intentionally hardcoded to Alpaca's PAPER trading endpoint (not configurable via
 # secrets) so this bot can never place a live order. ALPACA_ID/ALPACA_SECRET must be
@@ -225,15 +330,41 @@ with st.sidebar:
     notional_per_trade = st.number_input("Capital per Trade ($)", min_value=10.0, value=500.0, step=50.0)
     max_positions = st.number_input("Max Concurrent Positions", min_value=1, value=8, step=1)
 
+    st.markdown("---")
+    st.subheader("🧪 60-Day Trial")
+    trial_start = get_trial_start_date()
+    phase, trial_day = get_trial_phase(trial_start)
+    if trial_start is None:
+        st.error("No GITHUB_TOKEN secret — trial clock/log can't persist. Forcing DRY RUN (no orders will be placed) until it's configured.")
+    elif phase == "DRY_RUN":
+        st.info(f"Day {trial_day + 1} of {TRIAL_DRY_RUN_DAYS} — **DRY RUN**\nSignals logged, no orders placed.\nStarted {trial_start.isoformat()}")
+    elif phase == "PAPER":
+        st.success(f"Day {trial_day + 1 - TRIAL_DRY_RUN_DAYS} of {TRIAL_PAPER_DAYS} — **PAPER TRADING**\nReal orders against Alpaca's paper account.")
+    else:
+        st.warning(f"Day {trial_day + 1} — **TRIAL COMPLETE**\nNo new positions will open. Existing paper positions can still be closed. Review the 60-day log before deciding on live trading.")
+
 # --- MAIN LOOP (Always Runs) ---
 tickers = [t.strip().upper() for t in tickers_txt.split(",") if t.strip()]
 rows = []
 
-trading_ready = enable_trading and alpaca_id and alpaca_secret
+trading_base_ready = enable_trading and alpaca_id and alpaca_secret
+can_open_new = trading_base_ready and phase == "PAPER"
+can_close = trading_base_ready and phase in ("PAPER", "REVIEW")
+
 # Snapshot of currently-held positions for this scan pass. Updated locally as orders
 # are submitted below so we don't buy the same name twice or oversell within one pass.
-open_positions = get_open_positions(alpaca_id, alpaca_secret) if trading_ready else {}
-open_symbols = set(open_positions.keys())
+trial_log_text, trial_log_sha = (gh_get_file(TRIAL_LOG_PATH) if GITHUB_TOKEN else (None, None))
+if phase == "DRY_RUN":
+    open_positions = {}
+    open_symbols = derive_simulated_positions(trial_log_text)
+elif trading_base_ready:
+    open_positions = get_open_positions(alpaca_id, alpaca_secret)
+    open_symbols = set(open_positions.keys())
+else:
+    open_positions = {}
+    open_symbols = set()
+
+new_log_rows = []
 
 # Progress spinner
 with st.spinner(f"Scanning {len(tickers)} tickers..."):
@@ -257,7 +388,20 @@ with st.spinner(f"Scanning {len(tickers)} tickers..."):
 
             trade_note = "-"
             if decision == "BUY":
-                if not trading_ready:
+                if phase == "DRY_RUN":
+                    if sym in open_symbols:
+                        trade_note = "Already Held (sim)"
+                    elif len(open_symbols) >= max_positions:
+                        trade_note = "Max Positions (sim)"
+                    else:
+                        open_symbols.add(sym)
+                        trade_note = "🧪 Would BUY (dry run)"
+                        new_log_rows.append({"ts": datetime.utcnow().isoformat(), "mode": "DRY_RUN", "action": "BUY",
+                                              "ticker": sym, "price": price, "rsi": round(rsi, 2), "sma20": round(sma20, 2),
+                                              "sentiment": round(sent, 3), "conf": round(conf, 2)})
+                elif phase == "REVIEW":
+                    trade_note = "⏸ Trial Frozen (Review)"
+                elif not can_open_new:
                     trade_note = "Trading Off"
                 elif sym in open_symbols:
                     trade_note = "Already Held"
@@ -268,10 +412,22 @@ with st.spinner(f"Scanning {len(tickers)} tickers..."):
                     if sc in (200, 201):
                         open_symbols.add(sym)
                         trade_note = f"✅ Bought ${notional_per_trade:.0f}"
+                        new_log_rows.append({"ts": datetime.utcnow().isoformat(), "mode": "PAPER", "action": "BUY",
+                                              "ticker": sym, "price": price, "rsi": round(rsi, 2), "sma20": round(sma20, 2),
+                                              "sentiment": round(sent, 3), "conf": round(conf, 2), "notional": notional_per_trade})
                     else:
                         trade_note = f"⚠️ Buy Failed: {e or sc}"
             elif decision == "SELL":
-                if not trading_ready:
+                if phase == "DRY_RUN":
+                    if sym not in open_symbols:
+                        trade_note = "No Position (sim)"
+                    else:
+                        open_symbols.discard(sym)
+                        trade_note = "🧪 Would SELL (dry run)"
+                        new_log_rows.append({"ts": datetime.utcnow().isoformat(), "mode": "DRY_RUN", "action": "SELL",
+                                              "ticker": sym, "price": price, "rsi": round(rsi, 2), "sma20": round(sma20, 2),
+                                              "sentiment": round(sent, 3), "conf": round(conf, 2)})
+                elif not can_close:
                     trade_note = "Trading Off"
                 elif sym not in open_symbols:
                     trade_note = "No Position"
@@ -280,6 +436,9 @@ with st.spinner(f"Scanning {len(tickers)} tickers..."):
                     if sc in (200, 201):
                         open_symbols.discard(sym)
                         trade_note = "✅ Sold (Closed)"
+                        new_log_rows.append({"ts": datetime.utcnow().isoformat(), "mode": "PAPER", "action": "SELL",
+                                              "ticker": sym, "price": price, "rsi": round(rsi, 2), "sma20": round(sma20, 2),
+                                              "sentiment": round(sent, 3), "conf": round(conf, 2)})
                     else:
                         trade_note = f"⚠️ Sell Failed: {e or sc}"
 
@@ -295,6 +454,14 @@ with st.spinner(f"Scanning {len(tickers)} tickers..."):
             rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "CONF": round(conf,2), "TRADE": trade_note, "NEWS": headline})
         except: pass
 
+# One commit per scan pass (not per ticker) for every new dry-run/paper log entry,
+# to keep commit volume on the trial branch reasonable.
+if new_log_rows and GITHUB_TOKEN:
+    new_lines = "\n".join(json.dumps(r) for r in new_log_rows)
+    updated_text = (trial_log_text.rstrip("\n") + "\n" + new_lines) if trial_log_text else new_lines
+    gh_put_file(TRIAL_LOG_PATH, updated_text + "\n", trial_log_sha,
+                f"Trial log: {len(new_log_rows)} new entr{'y' if len(new_log_rows) == 1 else 'ies'}")
+
 # --- DISPLAY HUD ---
 if rows:
     df = pd.DataFrame(rows)
@@ -308,7 +475,7 @@ if rows:
     m2.metric("Buy Signals", buys)
     m3.metric("Sell Signals", sells)
     m4.metric("Market RSI (Avg)", round(avg_rsi, 1))
-    m5.metric("Open Positions (Paper)", len(open_symbols) if trading_ready else "Off")
+    m5.metric(f"Open Positions ({phase})", len(open_symbols))
     
     st.markdown("---")
 
