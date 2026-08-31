@@ -1,16 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-QuantScout PRO TERMINAL (v5.4 - AUTO-START / ALWAYS ON)
+QuantScout PRO TERMINAL (v5.5 - AUTO-START / ALWAYS ON)
 """
 import streamlit as st
 import pandas as pd
 import requests
-import time
 import yfinance as yf
-from GoogleNews import GoogleNews
-from datetime import datetime
-import pytz 
+from datetime import datetime, date
+import pytz
 from typing import Any, Dict, Optional
+
+try:
+    from GoogleNews import GoogleNews
+except ImportError:
+    GoogleNews = None
+
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:
+    st_autorefresh = None
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="QuantScout Cloud", layout="wide", page_icon="🦅")
@@ -33,7 +41,7 @@ TG_ID = get_secret("TG_ID")
 
 # --- UTILS ---
 SESSION = requests.Session()
-SESSION.headers.update({"user-agent": "QuantScoutCloud/5.4"})
+SESSION.headers.update({"user-agent": "QuantScoutCloud/5.5"})
 
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -101,7 +109,9 @@ def fetch_indicators_hybrid(symbol, kid, sec):
                 closes = pd.Series([b["c"] for b in bars])
                 delta = closes.diff()
                 up, down = delta.clip(lower=0), -delta.clip(upper=0)
-                rs = up.ewm(alpha=1/14).mean() / down.ewm(alpha=1/14).mean()
+                # adjust=False reproduces Wilder's original recursive smoothing;
+                # pandas' default (adjust=True) is a different, biased average.
+                rs = up.ewm(alpha=1/14, adjust=False).mean() / down.ewm(alpha=1/14, adjust=False).mean()
                 rsi = 100 - (100/(1+rs)).iloc[-1]
                 sma20 = closes.rolling(20).mean().iloc[-1]
                 return float(sma20), float(rsi), ""
@@ -111,7 +121,7 @@ def fetch_indicators_hybrid(symbol, kid, sec):
             closes = hist["Close"]
             delta = closes.diff()
             up, down = delta.clip(lower=0), -delta.clip(upper=0)
-            rs = up.ewm(alpha=1/14).mean() / down.ewm(alpha=1/14).mean()
+            rs = up.ewm(alpha=1/14, adjust=False).mean() / down.ewm(alpha=1/14, adjust=False).mean()
             rsi = 100 - (100/(1+rs)).iloc[-1]
             sma20 = closes.rolling(20).mean().iloc[-1]
             return float(sma20), float(rsi), ""
@@ -126,18 +136,27 @@ def fetch_news_hybrid(symbol, t_key):
         if j and isinstance(j, list) and len(j) > 0:
             title = j[0].get("title", "")
             return analyzer.polarity_scores(title).get("compound", 0.0), f"[Tiingo] {title}"
-    try:
-        goog = GoogleNews(lang='en', period='1d')
-        goog.search(f"{symbol} stock news")
-        results = goog.result()
-        if results and len(results) > 0:
-            title = results[0].get("title", "")
-            return analyzer.polarity_scores(title).get("compound", 0.0), f"[Google] {title}"
-    except: pass
+    if GoogleNews:
+        try:
+            goog = GoogleNews(lang='en', period='1d')
+            goog.search(f"{symbol} stock news")
+            results = goog.result()
+            if results and len(results) > 0:
+                title = results[0].get("title", "")
+                return analyzer.polarity_scores(title).get("compound", 0.0), f"[Google] {title}"
+        except: pass
     return 0.0, "No Data"
 
 # --- UI ---
-st.title("🦅 QuantScout Cloud v5.4 (Auto-Pilot)")
+st.title("🦅 QuantScout Cloud v5.5 (Auto-Pilot)")
+
+# Non-blocking client-side refresh (replaces the old blocking time.sleep()+st.rerun()
+# loop, which held the server thread/session open indefinitely and, combined with the
+# unbounded alert_key growth below, was the likely cause of the long-running crash).
+if st_autorefresh:
+    st_autorefresh(interval=60_000, key="auto_refresh")
+else:
+    st.warning("⚠️ streamlit-autorefresh not installed — page will not auto-update.")
 
 # Force Dark Mode Style for Metrics
 st.markdown("""
@@ -185,16 +204,21 @@ with st.spinner(f"Scanning {len(tickers)} tickers..."):
             if price and rsi > 0:
                 if price > sma20 and rsi < 70 and sent > 0.15: decision, conf = "BUY", 0.8 + (sent * 0.1)
                 elif price < sma20 and rsi > 30 and sent < -0.2: decision, conf = "SELL", 0.8
-                elif rsi < 35: decision, conf = "BUY", 0.5
+                # Oversold mean-reversion buy: only take it when news isn't actively
+                # bearish, otherwise this was catching falling knives in confirmed
+                # downtrends with negative sentiment (contradicts the SELL rule above).
+                elif rsi < 35 and sent >= -0.1: decision, conf = "BUY", 0.5 + max(0.0, sent) * 0.1
 
             if decision != "HOLD":
-                alert_key = f"{sym}_{decision}_{datetime.now().strftime('%H:%M')}"
-                if alert_key not in st.session_state:
-                    msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f}\n{headline}"
-                    send_telegram_alert_smart(msg, tg_token, tg_id) 
-                    st.session_state[alert_key] = True
+                alert_log = st.session_state.setdefault("alert_log", {})
+                alert_key = f"{sym}_{decision}"
+                today = date.today().isoformat()
+                if alert_log.get(alert_key) != today:
+                    msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f} | Conf: {conf:.2f}\n{headline}"
+                    send_telegram_alert_smart(msg, tg_token, tg_id)
+                    alert_log[alert_key] = today
 
-            rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "NEWS": headline})
+            rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "CONF": round(conf,2), "NEWS": headline})
         except: pass
 
 # --- DISPLAY HUD ---
@@ -217,11 +241,7 @@ if rows:
         return 'background-color: #1b4d3e' if val == 'BUY' else 'background-color: #4d1b1b' if val == 'SELL' else ''
     
     st.dataframe(
-        df.style.applymap(color_signal, subset=['SIGNAL']), 
-        use_container_width=True, 
+        df.style.applymap(color_signal, subset=['SIGNAL']),
+        use_container_width=True,
         height=600
     )
-
-# --- AUTO REFRESH ---
-time.sleep(60)
-st.rerun()
