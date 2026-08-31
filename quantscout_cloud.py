@@ -248,10 +248,12 @@ with st.spinner(f"Scanning {len(tickers)} tickers..."):
             if price and rsi > 0:
                 if price > sma20 and rsi < 70 and sent > 0.15: decision, conf = "BUY", 0.8 + (sent * 0.1)
                 elif price < sma20 and rsi > 30 and sent < -0.2: decision, conf = "SELL", 0.8
-                # Oversold mean-reversion buy: only take it when news isn't actively
-                # bearish, otherwise this was catching falling knives in confirmed
-                # downtrends with negative sentiment (contradicts the SELL rule above).
-                elif rsi < 35 and sent >= -0.1: decision, conf = "BUY", 0.5 + max(0.0, sent) * 0.1
+                # Oversold mean-reversion buy: only a short-term dip within an intact
+                # trend (price no more than 3% below its 20-day average), and only when
+                # news isn't actively bearish. Without the price check this still fired
+                # on a confirmed downtrend (price well below SMA20) any time sentiment
+                # was merely neutral/unavailable — a falling knife, just not on bad news.
+                elif rsi < 35 and price >= sma20 * 0.97 and sent >= -0.1: decision, conf = "BUY", 0.5 + max(0.0, sent) * 0.1
 
             trade_note = "-"
             if decision == "BUY":
