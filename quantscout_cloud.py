@@ -60,6 +60,37 @@ def http_get_json(url: str, headers: Optional[Dict]=None, params: Optional[Dict]
     except Exception as e:
         return 0, None, str(e)[:200]
 
+def http_post_json(url: str, headers: Optional[Dict]=None, json_body: Optional[Dict]=None):
+    try:
+        r = SESSION.post(url, headers=headers, json=json_body, timeout=5.0)
+        if r.status_code >= 400: return r.status_code, None, r.text[:200]
+        return r.status_code, r.json(), ""
+    except Exception as e:
+        return 0, None, str(e)[:200]
+
+# Intentionally hardcoded to Alpaca's PAPER trading endpoint (not configurable via
+# secrets) so this bot can never place a live order. ALPACA_ID/ALPACA_SECRET must be
+# keys generated from the Alpaca *paper* dashboard — live-account keys will simply
+# get a 401 here and orders will fail safely (visible in the TRADE column).
+ALPACA_TRADE_BASE = "https://paper-api.alpaca.markets"
+
+def get_open_positions(kid, sec):
+    if not kid or not sec: return {}
+    h = {"APCA-API-KEY-ID": kid, "APCA-API-SECRET-KEY": sec}
+    sc, j, e = http_get_json(f"{ALPACA_TRADE_BASE}/v2/positions", headers=h)
+    if sc == 200 and isinstance(j, list):
+        return {p["symbol"]: p.get("qty", "0") for p in j}
+    return {}
+
+def submit_market_order(symbol, side, kid, sec, notional=None, qty=None):
+    h = {"APCA-API-KEY-ID": kid, "APCA-API-SECRET-KEY": sec}
+    body = {"symbol": symbol, "side": side, "type": "market", "time_in_force": "day"}
+    if qty is not None:
+        body["qty"] = str(qty)
+    else:
+        body["notional"] = str(notional)
+    return http_post_json(f"{ALPACA_TRADE_BASE}/v2/orders", headers=h, json_body=body)
+
 # --- SMART ALERTS (DND PROTOCOL) ---
 def send_telegram_alert_smart(message, token, chat_id):
     if not token or not chat_id: return
@@ -187,9 +218,22 @@ with st.sidebar:
     # NO BUTTON - AUTO START LOGIC
     st.info("System is Scanning (Auto-Pilot)")
 
+    st.markdown("---")
+    st.subheader("📈 Auto-Trading")
+    st.caption("🧪 PAPER mode only — simulated orders, no real capital at risk.")
+    enable_trading = st.checkbox("Enable Order Execution", value=True)
+    notional_per_trade = st.number_input("Capital per Trade ($)", min_value=10.0, value=500.0, step=50.0)
+    max_positions = st.number_input("Max Concurrent Positions", min_value=1, value=8, step=1)
+
 # --- MAIN LOOP (Always Runs) ---
 tickers = [t.strip().upper() for t in tickers_txt.split(",") if t.strip()]
 rows = []
+
+trading_ready = enable_trading and alpaca_id and alpaca_secret
+# Snapshot of currently-held positions for this scan pass. Updated locally as orders
+# are submitted below so we don't buy the same name twice or oversell within one pass.
+open_positions = get_open_positions(alpaca_id, alpaca_secret) if trading_ready else {}
+open_symbols = set(open_positions.keys())
 
 # Progress spinner
 with st.spinner(f"Scanning {len(tickers)} tickers..."):
@@ -199,7 +243,7 @@ with st.spinner(f"Scanning {len(tickers)} tickers..."):
             if not price: price, src = fetch_polygon_price(sym, polygon_key)
             sma20, rsi, err = fetch_indicators_hybrid(sym, alpaca_id, alpaca_secret)
             sent, headline = fetch_news_hybrid(sym, tiingo_key)
-            
+
             decision, conf = "HOLD", 0.0
             if price and rsi > 0:
                 if price > sma20 and rsi < 70 and sent > 0.15: decision, conf = "BUY", 0.8 + (sent * 0.1)
@@ -209,16 +253,44 @@ with st.spinner(f"Scanning {len(tickers)} tickers..."):
                 # downtrends with negative sentiment (contradicts the SELL rule above).
                 elif rsi < 35 and sent >= -0.1: decision, conf = "BUY", 0.5 + max(0.0, sent) * 0.1
 
+            trade_note = "-"
+            if decision == "BUY":
+                if not trading_ready:
+                    trade_note = "Trading Off"
+                elif sym in open_symbols:
+                    trade_note = "Already Held"
+                elif len(open_symbols) >= max_positions:
+                    trade_note = "Max Positions"
+                else:
+                    sc, j, e = submit_market_order(sym, "buy", alpaca_id, alpaca_secret, notional=notional_per_trade)
+                    if sc in (200, 201):
+                        open_symbols.add(sym)
+                        trade_note = f"✅ Bought ${notional_per_trade:.0f}"
+                    else:
+                        trade_note = f"⚠️ Buy Failed: {e or sc}"
+            elif decision == "SELL":
+                if not trading_ready:
+                    trade_note = "Trading Off"
+                elif sym not in open_symbols:
+                    trade_note = "No Position"
+                else:
+                    sc, j, e = submit_market_order(sym, "sell", alpaca_id, alpaca_secret, qty=open_positions.get(sym))
+                    if sc in (200, 201):
+                        open_symbols.discard(sym)
+                        trade_note = "✅ Sold (Closed)"
+                    else:
+                        trade_note = f"⚠️ Sell Failed: {e or sc}"
+
             if decision != "HOLD":
                 alert_log = st.session_state.setdefault("alert_log", {})
                 alert_key = f"{sym}_{decision}"
                 today = date.today().isoformat()
                 if alert_log.get(alert_key) != today:
-                    msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f} | Conf: {conf:.2f}\n{headline}"
+                    msg = f"🦅 CLOUD ALERT\n{decision} {sym}\n${price} | RSI: {rsi:.1f} | Conf: {conf:.2f}\nTrade: {trade_note}\n{headline}"
                     send_telegram_alert_smart(msg, tg_token, tg_id)
                     alert_log[alert_key] = today
 
-            rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "CONF": round(conf,2), "NEWS": headline})
+            rows.append({"TICKER": sym, "PRICE": price, "RSI": round(rsi,1), "SIGNAL": decision, "CONF": round(conf,2), "TRADE": trade_note, "NEWS": headline})
         except: pass
 
 # --- DISPLAY HUD ---
@@ -229,11 +301,12 @@ if rows:
     sells = len(df[df["SIGNAL"] == "SELL"])
     avg_rsi = df["RSI"].mean() if "RSI" in df.columns else 0.0
     
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("Active Tickers", len(tickers))
     m2.metric("Buy Signals", buys)
     m3.metric("Sell Signals", sells)
     m4.metric("Market RSI (Avg)", round(avg_rsi, 1))
+    m5.metric("Open Positions (Paper)", len(open_symbols) if trading_ready else "Off")
     
     st.markdown("---")
 
