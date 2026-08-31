@@ -194,6 +194,12 @@ def send_telegram_alert_smart(message, token, chat_id):
 
 
 # --- Decision logic ---
+# Only the two primary, trend-confirmed signals fire trades: BUY requires an actual
+# uptrend + healthy momentum + positive sentiment; SELL requires an actual downtrend
+# + momentum breaking down + negative sentiment. The oversold mean-reversion "buy
+# the shallow dip" branch (RSI<35 alone) was removed on request — it's a real,
+# independently-legitimate signal type, but a weaker/secondary one than the two
+# trend-confirmed rules, and shouldn't be firing trades alongside them.
 def decide(price, sma20, rsi, sent):
     decision, conf = "HOLD", 0.0
     if price and rsi > 0:
@@ -201,12 +207,6 @@ def decide(price, sma20, rsi, sent):
             decision, conf = "BUY", 0.8 + (sent * 0.1)
         elif price < sma20 and rsi > 30 and sent < -0.2:
             decision, conf = "SELL", 0.8
-        # Oversold mean-reversion buy: only a short-term dip within an intact trend
-        # (price no more than 3% below its 20-day average), and only when news isn't
-        # actively bearish — otherwise this fires on a confirmed downtrend any time
-        # sentiment is merely neutral/unavailable, i.e. a falling knife either way.
-        elif rsi < 35 and price >= sma20 * 0.97 and sent >= -0.1:
-            decision, conf = "BUY", 0.5 + max(0.0, sent) * 0.1
     return decision, conf
 
 
