@@ -22,6 +22,26 @@ def _tickers_from_env():
     return tickers or engine.DEFAULT_TICKERS
 
 
+def _env_str(name, default=""):
+    # A GitHub Actions repo *variable* (vars.X) that isn't set still gets injected as
+    # an empty-string env var, not an absent one — so os.environ.get(name, default)
+    # never falls back to default. Treat "" the same as unset for all env-derived config.
+    val = os.environ.get(name, "")
+    return val if val else default
+
+def _env_float(name, default):
+    val = _env_str(name)
+    return float(val) if val else default
+
+def _env_int(name, default):
+    val = _env_str(name)
+    return int(val) if val else default
+
+def _env_bool(name, default):
+    val = _env_str(name)
+    return (val.lower() != "false") if val else default
+
+
 def main():
     creds = {
         "alpaca_id": os.environ.get("ALPACA_ID", ""),
@@ -33,9 +53,9 @@ def main():
         "github_token": os.environ.get("TRIAL_GITHUB_TOKEN", ""),
     }
     config = {
-        "enable_trading": os.environ.get("ENABLE_TRADING", "true").lower() != "false",
-        "notional_per_trade": float(os.environ.get("NOTIONAL_PER_TRADE", "500")),
-        "max_positions": int(os.environ.get("MAX_POSITIONS", "8")),
+        "enable_trading": _env_bool("ENABLE_TRADING", True),
+        "notional_per_trade": _env_float("NOTIONAL_PER_TRADE", 500.0),
+        "max_positions": _env_int("MAX_POSITIONS", 8),
     }
 
     if not creds["github_token"]:
