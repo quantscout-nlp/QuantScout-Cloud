@@ -1,0 +1,48 @@
+name: QuantScout Trading Engine
+
+# Runs the scan/decide/trade/log pass on a schedule, independent of whether anyone
+# has the Streamlit dashboard open in a browser. This is the sole trading path
+# during the 60-day trial (dry run -> paper) — the dashboard is read-only.
+#
+# NOTE: there is no market-hours gate here (matching the app itself) — this runs
+# around the clock, including weekends/holidays. Off-hours market orders queue for
+# the next session rather than filling immediately, so this doesn't cause bad
+# fills, just some wasted runs. Tighten the cron below if you want to restrict it
+# to roughly the US trading week.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements-engine.txt
+
+      - name: Run scan
+        env:
+          ALPACA_ID: ${{ secrets.ALPACA_ID }}
+          ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
+          POLYGON_KEY: ${{ secrets.POLYGON_KEY }}
+          TIINGO_KEY: ${{ secrets.TIINGO_KEY }}
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_ID: ${{ secrets.TG_ID }}
+          # A fine-grained PAT scoped to this repo only, with Contents: Read and
+          # write permission, so the engine can commit to the bot-trial-log branch.
+          # Deliberately NOT named GITHUB_TOKEN to avoid confusion with the
+          # Actions-provided ambient token of the same name.
+          TRIAL_GITHUB_TOKEN: ${{ secrets.TRIAL_LOG_TOKEN }}
+          WATCHLIST: ${{ vars.WATCHLIST }}
+          ENABLE_TRADING: ${{ vars.ENABLE_TRADING }}
+          NOTIONAL_PER_TRADE: ${{ vars.NOTIONAL_PER_TRADE }}
+          MAX_POSITIONS: ${{ vars.MAX_POSITIONS }}
+        run: python scripts/run_scan.py
