@@ -52,6 +52,47 @@ def print_ranking(rows, top, show_all):
               f"{move:>7}  {note}")
 
 
+ACTION_ORDER = ["PRIMARY", "GAP_WATCH", "ALTERNATE", "STAND_ASIDE", "AVOID_LONG", "DISQUALIFIED"]
+
+
+def print_triage(dataset, rows):
+    """Per-ticker action card, grouped by action rather than by rank.
+
+    Grouped deliberately: at 9:25am you need to know what to DO with a name, and
+    scanning a rank-ordered list for that is how a disqualified ticker ends up in a
+    live order.
+    """
+    triaged = rs.triage_all(rows)
+    weekend = dataset.get("weekend_developments", {})
+
+    print("\n" + "=" * 108)
+    print(f"TRIAGE FOR {dataset['next_regular_session']}")
+    print("=" * 108)
+    if weekend.get("net_read"):
+        print("\n" + weekend["net_read"])
+    if weekend.get("items"):
+        print("\nPost-close developments folded in:")
+        for item in weekend["items"]:
+            print(f"  [{item['date']}] {item['headline']}")
+
+    by_action = {}
+    for row in triaged:
+        by_action.setdefault(row["action"], []).append(row)
+
+    for action in ACTION_ORDER:
+        group = by_action.get(action)
+        if not group:
+            continue
+        print(f"\n--- {action} ({len(group)}) -- {rs.TRIAGE_ACTIONS[action]}")
+        for row in group:
+            move = f"{row['move_pct']:+.1f}%" if row["move_pct"] is not None else "n/a"
+            print(f"  {row['symbol']:<6} score {row['score']:>6.2f}  {move:>7}  "
+                  f"{row['cluster']:<20} weekend={row['weekend_delta']}")
+            print(f"         {row['action_why']}")
+            if row.get("weekend_note") and row["weekend_delta"] != "unchanged":
+                print(f"         weekend: {row['weekend_note']}")
+
+
 def run_gate(rows, top):
     alpaca_id = os.environ.get("ALPACA_ID", "")
     alpaca_secret = os.environ.get("ALPACA_SECRET", "")
@@ -128,6 +169,8 @@ def main():
     ap.add_argument("--max-per-cluster", type=int, default=2,
                     help="concurrent long candidates allowed per correlation cluster")
     ap.add_argument("--live", action="store_true", help="run the mechanical gate on real bars")
+    ap.add_argument("--triage", action="store_true",
+                    help="print the per-ticker action card for the next session")
     ap.add_argument("--markdown", metavar="PATH", help="write a markdown report")
     ap.add_argument("--watchlist-var", action="store_true",
                     help="print a comma-separated WATCHLIST repo-variable line")
@@ -159,6 +202,9 @@ def main():
     for cluster, count in rs.cluster_exposure(rows).items():
         marker = "  <-- CONCENTRATION RISK" if count >= 4 else ""
         print(f"  {cluster:<22} {count}{marker}")
+
+    if args.triage:
+        print_triage(dataset, rows)
 
     if args.watchlist_var:
         tradeable = [r["symbol"] for r in rows

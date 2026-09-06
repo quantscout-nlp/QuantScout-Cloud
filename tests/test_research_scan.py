@@ -142,6 +142,63 @@ def test_cluster_cap_keeps_highest_ranked_member():
         assert all(m["cluster_capped"] for m in members[1:])
 
 
+# --- weekend deltas and triage -------------------------------------------------
+def test_headwind_cuts_conviction_on_a_long():
+    base = {"symbol": "L", "mentions": ["grok"], "universe": ["gainer"], "move_pct": 8.0,
+            "catalyst_quality": "company_specific_dated", "flags": []}
+    plain = rs.score_ticker(base)["score"]
+    head = rs.score_ticker(dict(base, weekend_delta="headwind"))["score"]
+    tail = rs.score_ticker(dict(base, weekend_delta="tailwind"))["score"]
+    assert head < plain < tail
+
+
+def test_headwind_deepens_conviction_on_an_avoid_rather_than_softening_it():
+    """The sign trap: a deteriorating name must not score BETTER for deteriorating."""
+    base = {"symbol": "S", "mentions": ["grok"], "universe": ["loser"], "move_pct": -12.0,
+            "catalyst_quality": "company_specific_dated", "flags": []}
+    plain = rs.score_ticker(base)["score"]
+    head = rs.score_ticker(dict(base, weekend_delta="headwind"))["score"]
+    assert plain < 0 and head < plain, (plain, head)
+
+
+def test_triage_assigns_exactly_one_action_per_ticker():
+    rows = rs.triage_all(rs.apply_cluster_cap(rs.rank(load())))
+    assert len(rows) == len(load()["tickers"])
+    assert all(r["action"] in rs.TRIAGE_ACTIONS for r in rows)
+
+
+def test_disqualified_never_reaches_a_tradeable_action():
+    for row in rs.triage_all(rs.apply_cluster_cap(rs.rank(load()))):
+        if row["disqualified"]:
+            assert row["action"] == "DISQUALIFIED", row["symbol"]
+
+
+def test_adverse_weekend_delta_stands_a_long_down():
+    row = rs.triage(rs.score_ticker({
+        "symbol": "ADV", "mentions": ["grok"], "universe": ["gainer"], "move_pct": 7.0,
+        "catalyst_quality": "company_specific_dated", "flags": [],
+        "weekend_delta": "adverse"}))
+    assert row["action"] == "STAND_ASIDE"
+
+
+def test_gap_risk_flag_routes_to_gap_watch_not_primary():
+    row = rs.triage(rs.score_ticker({
+        "symbol": "GAPR", "mentions": ["grok"], "universe": ["gainer"], "move_pct": 11.0,
+        "catalyst_quality": "company_specific_dated", "flags": ["gap_risk_high"],
+        "weekend_delta": "tailwind"}))
+    assert row["action"] == "GAP_WATCH"
+
+
+def test_weekend_reweighting_is_still_deterministic():
+    first = [(r["symbol"], r["score"], r["action"])
+             for r in rs.triage_all(rs.apply_cluster_cap(rs.rank(load())))]
+    for seed in range(5):
+        shuffled = copy.deepcopy(load())
+        random.Random(seed).shuffle(shuffled["tickers"])
+        assert [(r["symbol"], r["score"], r["action"])
+                for r in rs.triage_all(rs.apply_cluster_cap(rs.rank(shuffled)))] == first
+
+
 # --- mechanical gate -----------------------------------------------------------
 def _bars(n, start=50.0, step=0.20, rng=1.6, vol=4_000_000):
     bars, price = [], start

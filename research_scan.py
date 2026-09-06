@@ -90,7 +90,35 @@ SOFT_PENALTIES = {
     "below_ipo_price":  0.80,
     "move_date_ambiguous": 0.70,
     "wrong_sector_tag": 1.00,  # a data-hygiene flag; surfaced, not punished
+    "thesis_decelerating": 0.70,  # the driver still works, but its RATE OF CHANGE is falling
+    "move_size_disputed": 0.85,   # sources disagree on how far it actually moved
+    "gap_risk_high":     0.80,    # a live catalyst likely to gap the entry away overnight
 }
+
+# How a post-close development rescales conviction. Applied to the score's MAGNITUDE,
+# with the sign handled separately -- see _weekend_multiplier for why that matters.
+WEEKEND_DELTA_WEIGHT = {
+    "tailwind":  1.20,   # a new catalyst pushing the existing thesis forward
+    "unchanged": 1.00,
+    "mixed":     0.85,   # new information cuts both ways
+    "headwind":  0.75,   # the thesis still holds but conditions turned against it
+    "adverse":   0.50,   # the new information argues against the thesis outright
+}
+
+
+def _weekend_multiplier(delta: str, raw_sign: int) -> float:
+    """Scale conviction by what happened after the close.
+
+    The subtlety: 'headwind' describes the STOCK, not the trade. On a long candidate
+    a headwind cuts conviction. On a name already scored SHORT/AVOID, that same
+    headwind *deepens* the reason to avoid it -- so the magnitude must grow, not
+    shrink. Naively multiplying a negative score by 0.75 would make a deteriorating
+    name look more attractive, which is exactly backwards.
+    """
+    weight = WEEKEND_DELTA_WEIGHT.get(delta, 1.0)
+    if raw_sign < 0 and weight:
+        return 1.0 / weight
+    return weight
 
 
 def _buckets_for(rec: Dict[str, Any]) -> List[str]:
@@ -171,7 +199,11 @@ def score_ticker(rec: Dict[str, Any]) -> Dict[str, Any]:
     soft = _soft_multiplier(flags)
 
     disqualifiers = [f for f in flags if f in HARD_DISQUALIFIERS]
-    raw = consensus * bucket * quality * soft
+    pre_weekend = consensus * bucket * quality * soft
+
+    delta = rec.get("weekend_delta", "unchanged")
+    weekend_mult = _weekend_multiplier(delta, 1 if pre_weekend >= 0 else -1)
+    raw = pre_weekend * weekend_mult
     score = 0.0 if disqualifiers else raw
 
     return {
@@ -188,6 +220,10 @@ def score_ticker(rec: Dict[str, Any]) -> Dict[str, Any]:
         "bucket_weight": round(bucket, 3),
         "quality_mult": quality,
         "soft_mult": round(soft, 3),
+        "weekend_delta": delta,
+        "weekend_mult": round(weekend_mult, 3),
+        "weekend_note": rec.get("weekend_note", ""),
+        "pre_weekend_score": round(pre_weekend, 3),
         "disqualified": bool(disqualifiers),
         "disqualify_reasons": [HARD_DISQUALIFIERS[f] for f in disqualifiers],
         "flags": flags,
@@ -279,3 +315,39 @@ def apply_cluster_cap(rows: List[Dict[str, Any]], max_per_cluster: int = 2) -> L
             row["cluster_slot"] = None
         out.append(row)
     return out
+
+
+# --- Tuesday triage -------------------------------------------------------------
+# A single deterministic decision tree mapping a scored row to one action. Order is
+# load-bearing: each branch is strictly more permissive than the one above it, so a
+# name can only ever be downgraded by an earlier check, never rescued by a later one.
+TRIAGE_ACTIONS = {
+    "DISQUALIFIED": "Never trade under these rules. The reason is structural, not an opinion.",
+    "AVOID_LONG":   "Do not buy. Guide-down / repricing drift runs WITH the surprise, not against it.",
+    "STAND_ASIDE":  "Weekend development argues against the thesis. No position until it resolves.",
+    "GAP_WATCH":    "Live catalyst likely to gap the entry away. Trade ONLY if the open gap clears the cap.",
+    "ALTERNATE":    "Cluster-capped. Promote only if a primary in the same cluster fails its gate.",
+    "PRIMARY":      "Eligible. Trade if the regime gate, mechanical gate and entry trigger all clear.",
+}
+
+
+def triage(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Map one scored row to exactly one Tuesday action."""
+    if row["disqualified"]:
+        action, why = "DISQUALIFIED", (row["disqualify_reasons"] or ["structural"])[0]
+    elif row["direction"] == "SHORT/AVOID":
+        action, why = "AVOID_LONG", "scored negative -- deteriorating, not a dip"
+    elif row.get("weekend_delta") == "adverse":
+        action, why = "STAND_ASIDE", row.get("weekend_note", "adverse weekend development")
+    elif "gap_risk_high" in row["flags"]:
+        action, why = "GAP_WATCH", "live weekend catalyst -- the move may already be gone at the open"
+    elif row.get("cluster_capped"):
+        action, why = "ALTERNATE", f"{row['cluster']} slot {row['cluster_slot']} -- concentration cap"
+    else:
+        action, why = "PRIMARY", "clears ranking; still subject to every gate"
+    return {**row, "action": action, "action_why": why,
+            "action_meaning": TRIAGE_ACTIONS[action]}
+
+
+def triage_all(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [triage(r) for r in rows]
