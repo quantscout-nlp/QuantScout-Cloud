@@ -230,9 +230,36 @@ def fetch_quote(symbol: str, alpaca_id: str = "", alpaca_secret: str = "") -> Op
     return {"bid": bid, "ask": ask} if bid and ask else None
 
 
+# --- Account configuration ------------------------------------------------------
+# Decided 2026-09-06. One account size, one risk number -- earlier research carried
+# both $20k/1% and $25k/1.5%, and the sizer cannot be fed two.
+DEFAULT_EQUITY = 25_000.0
+DEFAULT_RISK_PCT = 1.5
+DEFAULT_MAX_NOTIONAL_PCT = 25.0
+
+
+def full_r_stop_pct(risk_pct: float = DEFAULT_RISK_PCT,
+                    max_notional_pct: float = DEFAULT_MAX_NOTIONAL_PCT) -> float:
+    """The stop distance (% of price) at which a full R is actually reachable.
+
+    Falls straight out of the two limits and is INDEPENDENT OF PRICE: the cap allows
+    `max_notional_pct` of equity in one position, and those shares risk a full
+    `risk_pct` only when the stop sits `risk_pct / max_notional_pct` away.
+
+    At the configured 1.5% / 25%, that is 6.00% -- far wider than any intraday
+    momentum stop. So on this account the NOTIONAL CAP does the sizing, not the risk
+    number, and actual risk on a 1-3% stop lands between 0.25% and 0.75% of equity.
+    That is not a bug: the cap is what bounds a gap through the stop, which matters
+    more on a small account than hitting a nominal R. But it must be stated, because
+    an expectancy model built on "1.5% per trade" would be overstating risk by 2-6x.
+    """
+    return risk_pct / max_notional_pct * 100.0
+
+
 # --- Risk mechanics -------------------------------------------------------------
-def position_size(equity: float, risk_pct: float, entry: float, stop: float,
-                  max_notional_pct: float = 25.0) -> Dict[str, Any]:
+def position_size(equity: float = DEFAULT_EQUITY, risk_pct: float = DEFAULT_RISK_PCT,
+                  entry: float = 0.0, stop: float = 0.0,
+                  max_notional_pct: float = DEFAULT_MAX_NOTIONAL_PCT) -> Dict[str, Any]:
     """Risk-based share count, with a notional cap as the backstop.
 
     Shares come from the stop distance -- risk dollars divided by per-share risk --
@@ -270,6 +297,11 @@ def position_size(equity: float, risk_pct: float, entry: float, stop: float,
         "uncapped_shares": raw_shares,
         # When the cap binds, the trade risks LESS than one R -- which is fine, but
         # it must be reported so the expectancy math is not silently overstated.
-        "note": ("notional cap binding -- actual risk is below the full R"
-                 if shares < raw_shares else "full risk allocated"),
+        "full_r_stop_pct": round(full_r_stop_pct(risk_pct, max_notional_pct), 2),
+        "risk_pct_of_equity": round(shares * per_share_risk / equity * 100.0, 3),
+        "note": (
+            f"notional cap binding -- actual risk {shares * per_share_risk / equity * 100:.2f}% "
+            f"of equity, not the nominal {risk_pct}%. A full R needs a stop "
+            f"{full_r_stop_pct(risk_pct, max_notional_pct):.2f}% away."
+            if shares < raw_shares else "full risk allocated"),
     }

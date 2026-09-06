@@ -52,6 +52,34 @@ def print_ranking(rows, top, show_all):
               f"{move:>7}  {note}")
 
 
+def print_size_table(dataset, stops=(1.0, 2.0, 3.0, 4.0, 6.0)):
+    """Shares and actual risk per candidate across plausible stop distances.
+
+    Only tickers carrying a VERIFIED close appear -- sizing off an unconfirmed price
+    is how a position ends up twice the size you meant.
+    """
+    eq, risk, cap = mf.DEFAULT_EQUITY, mf.DEFAULT_RISK_PCT, mf.DEFAULT_MAX_NOTIONAL_PCT
+    rows = rs.triage_all(rs.apply_cluster_cap(rs.rank(dataset)))
+    sized = [r for r in rows if r.get("close")
+             and r["action"] in ("PRIMARY", "GAP_WATCH", "ALTERNATE")]
+
+    print(f"\nSIZING -- equity ${eq:,.0f}, risk {risk}% (${eq * risk / 100:.0f}/trade), "
+          f"notional cap {cap:.0f}% (${eq * cap / 100:,.0f})")
+    print(f"A full R is only reachable at a stop {mf.full_r_stop_pct(risk, cap):.2f}% away. "
+          f"Below that the CAP sizes the trade, not the risk number.")
+    print("-" * 108)
+    print(f"{'TICKER':<8}{'CLOSE':>9}  " + "".join(f"{str(s) + '% stop':>17}" for s in stops))
+    for row in sized:
+        cells = []
+        for sp in stops:
+            res = mf.position_size(eq, risk, row["close"], row["close"] * (1 - sp / 100))
+            cells.append(f"{res['shares']:>5}sh ${res['actual_risk']:>6.0f}"
+                         f"{'*' if res['notional_capped'] else ' '}")
+        print(f"{row['symbol']:<8}{row['close']:>9.2f}  " + "".join(f"{c:>17}" for c in cells))
+    print("\n* = cap binding; actual risk is BELOW the nominal R. Size expectancy on the "
+          "dollar figure shown, never on the nominal risk %.")
+
+
 ACTION_ORDER = ["PRIMARY", "GAP_WATCH", "ALTERNATE", "STAND_ASIDE", "AVOID_LONG", "DISQUALIFIED"]
 
 
@@ -176,7 +204,14 @@ def main():
                     help="print a comma-separated WATCHLIST repo-variable line")
     ap.add_argument("--size", nargs=4, metavar=("EQUITY", "RISK_PCT", "ENTRY", "STOP"),
                     type=float, help="position-size one trade and exit")
+    ap.add_argument("--size-table", action="store_true",
+                    help=f"shares/risk grid at ${mf.DEFAULT_EQUITY:,.0f} / "
+                         f"{mf.DEFAULT_RISK_PCT}%% for tickers with a verified close")
     args = ap.parse_args()
+
+    if args.size_table:
+        print_size_table(load(args.dataset))
+        return
 
     if args.size:
         equity, risk_pct, entry, stop = args.size

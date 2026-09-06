@@ -262,6 +262,36 @@ def test_position_size_uncapped_when_stop_is_wide_enough():
     assert result["actual_risk"] == 372.0
 
 
+def test_full_r_stop_is_price_independent_and_derived_from_the_two_limits():
+    """The threshold is risk% / cap% — nothing to do with the stock's price."""
+    assert mf.full_r_stop_pct(1.5, 25.0) == 6.0
+    assert mf.full_r_stop_pct(1.0, 25.0) == 4.0
+    assert mf.full_r_stop_pct(0.5, 25.0) == 2.0
+    for price in (5.0, 46.13, 84.30, 282.82, 1000.0):
+        threshold = mf.full_r_stop_pct() / 100.0
+        at = mf.position_size(entry=price, stop=price * (1 - threshold))
+        assert not at["notional_capped"], (price, at)
+        # Meaningfully tighter than the threshold, not marginally: share counts are
+        # integers, so on a high-priced name (6 shares at $1,000) floor() collapses
+        # the raw and capped counts onto each other right at the boundary. The
+        # property is continuous; the sizing is not.
+        tighter = mf.position_size(entry=price, stop=price * (1 - threshold * 0.5))
+        assert tighter["notional_capped"], (price, tighter)
+
+
+def test_configured_account_is_the_default():
+    assert mf.DEFAULT_EQUITY == 25_000.0 and mf.DEFAULT_RISK_PCT == 1.5
+    res = mf.position_size(entry=84.30, stop=82.10)
+    assert res["risk_dollars"] == 375.0
+
+
+def test_capped_result_reports_true_risk_not_the_nominal_one():
+    res = mf.position_size(entry=84.30, stop=84.30 * 0.98)
+    assert res["notional_capped"]
+    assert res["risk_pct_of_equity"] < mf.DEFAULT_RISK_PCT
+    assert "not the nominal" in res["note"]
+
+
 def test_position_size_rejects_an_inverted_stop():
     assert mf.position_size(25_000, 1.5, 100.0, 105.0)["shares"] == 0
 
