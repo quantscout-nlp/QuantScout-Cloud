@@ -42,3 +42,20 @@ Read and write** permission, so the scheduled job can commit to `bot-trial-log`.
 `WATCHLIST` (comma-separated tickers; defaults to the built-in list if unset),
 `ENABLE_TRADING` (`true`/`false`), `NOTIONAL_PER_TRADE` (dollars per position),
 `MAX_POSITIONS` (concurrent position cap).
+
+## Running a scan manually from Windows
+
+`run_scan.bat` runs the exact same engine the scheduled GitHub Actions job runs,
+from a local Command Prompt — useful to verify real credentials work before
+trusting them in GitHub Actions secrets, or to trigger a one-off pass by hand.
+
+1. Copy `secrets.local.bat.example` to `secrets.local.bat` (same folder) and
+   fill in your real values. `secrets.local.bat` is gitignored — it will never
+   be committed.
+2. Double-click `run_scan.bat`, or run it from Command Prompt:
+   ```
+   run_scan.bat
+   ```
+   It installs dependencies from `requirements-engine.txt` and runs
+   `scripts\run_scan.py`, printing the phase, open positions, and any
+   BUY/SELL signals for this pass. Requires Python 3.11+ on `PATH`.
