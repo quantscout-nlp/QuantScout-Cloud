@@ -1,0 +1,4 @@
+# Tooling for tests and linting. Not needed by the scheduled engine or the
+# dashboard at runtime — see requirements-engine.txt / requirements.txt for those.
+pytest>=8.0,<9
+ruff>=0.6,<1

@@ -1,0 +1,20 @@
+# Lint config for QuantScout-Cloud.
+#
+# The valuable rules here are pyflakes (F) — undefined names, unused imports,
+# shadowed variables — plus E9 for syntax/IO errors. The default rule set also
+# includes two purely stylistic checks that the existing engine deliberately
+# violates throughout, so they are waived rather than triggering a 35-finding
+# restyle of working trading code:
+#
+#   E701  compact `if not x: return` one-liners, used consistently in engine.py
+#   E722  bare `except:` around every network fetch, so one bad ticker or a
+#         flaky provider can never abort a whole scan pass
+#
+# If you want either enforced, fix the code in a dedicated commit rather than
+# mixing a restyle into a behavior change.
+line-length = 110
+target-version = "py311"
+
+[lint]
+select = ["E4", "E7", "E9", "F"]
+ignore = ["E701", "E722"]
