@@ -105,11 +105,35 @@ These block a paper candidate: a non-session day, a stale feed, and the wash-sal
 
    Optional variables: `DESK_RVOL_BASIS` (`SIP` or `WEBULL`) and `DESK_WASH_SALE`.
 4. **Test the failover.** Merge the failover workflow PR into `main`, then go to Actions → *Recovery Desk failover* → *Run workflow* (force = true).
-5. **Worker.** Create the VM (e2-micro, Debian 12, no external ingress except SSH). Then run `curl -fsSLO https://raw.githubusercontent.com/quantscout-nlp/QuantScout-Cloud/recovery-desk/deploy/setup_vm.sh && sudo bash setup_vm.sh`. Fill `/etc/recovery-desk.env` with the same values but without the `DESK_` prefix (the template lists them). Finally run `sudo systemctl enable --now recovery-desk`.
+5. **Worker (free e2-micro).** You need a Google Cloud project with a billing account attached (the free tier still asks for one) and the Compute Engine API. Open Cloud Shell and run:
+
+   ```
+   curl -fsSLO https://raw.githubusercontent.com/quantscout-nlp/QuantScout-Cloud/recovery-desk/deploy/create_vm_gcloud.sh
+   bash create_vm_gcloud.sh
+   ```
+
+   It creates the VM (e2-micro, Debian 12, 30 GB standard disk, us-east1-b, no service account, Shielded VM, OS Login) and runs `deploy/setup_vm.sh` on it. Then SSH in, fill `/etc/recovery-desk.env` (names in the table below), and run `sudo systemctl enable --now recovery-desk`.
+
+   Free-tier limits: 1 e2-micro, 30 GB standard disk and 1 GB of outbound traffic a month (North America), in us-east1, us-central1 or us-west1 only. Google may bill the VM's external IPv4 address (about $0.005/hour, roughly $3.65/month). Check the first invoice and set a budget alert (Billing → Budgets & alerts, for example $5).
 6. **Dashboard.** In Streamlit Community Cloud, create a new app: repo `quantscout-nlp/QuantScout-Cloud`, branch `recovery-desk`, file `recovery_app.py`.
    - Secrets: the Google values, `RECOVERY_DRIVE_FOLDER_ID`, and `RECOVERY_SNAPSHOT_KEY`.
    - Optional: `GITHUB_TOKEN` for the Refresh button (a fine-grained token, this repo only, Actions: write).
    - Then set sharing to private and invite only yourself.
 7. **Security settings.** Work through the checklist in `SECURITY.md`.
+
+### Where each secret comes from
+
+| GitHub env secret | Worker `/etc/recovery-desk.env` / Streamlit secret | Where you get it |
+|---|---|---|
+| `DESK_ALPACA_ID`, `DESK_ALPACA_SECRET` | `ALPACA_ID`, `ALPACA_SECRET` | alpaca.markets → sign in → switch to a **Paper** account (open a second paper account just for the desk) → *API Keys* → Generate. SIP on paper keys follows your login's Algo Trader Plus subscription. If Alpaca refuses SIP, the desk falls back to IEX for bars, says so in the health line, and never uses IEX volume for RVOL20. |
+| `DESK_WEBULL_APP_KEY`, `DESK_WEBULL_APP_SECRET` | `WEBULL_APP_KEY`, `WEBULL_APP_SECRET` | developer.webull.com → *Apply for API* → create an application → App Key / App Secret. Market data also needs the OpenAPI market-data subscription (without it Webull answers 403). |
+| `DESK_MASSIVE_KEY` | `POLYGON_KEY` | massive.com → dashboard → *API Keys* (Massive is the former Polygon.io; same key format). |
+| `DESK_TIINGO_KEY` | `TIINGO_KEY` | tiingo.com → account → *API* → token. |
+| `DESK_GOOGLE_OAUTH_CLIENT_ID`, `..._CLIENT_SECRET`, `..._REFRESH_TOKEN` | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN` | Printed by `scripts/google_drive_token.py` (step 2). |
+| `DESK_DRIVE_FOLDER_ID` | `RECOVERY_DRIVE_FOLDER_ID` | Printed by the same script. |
+| `DESK_SNAPSHOT_KEY` | `RECOVERY_SNAPSHOT_KEY` | Printed by the same script (a random 64-character key). Use the **same** value in all three places, or the dashboard shows TAMPERED. |
+| variable `DESK_RVOL_BASIS` | `RECOVERY_RVOL_BASIS` | You choose: `SIP` (the v1.6.2 rule). |
+
+Enter GitHub values at: repo → **Settings → Environments → New environment** `recovery-desk` → *Deployment branches*: selected branches, `main` → **Add environment secret** (one per row). Never paste a key into a chat, an issue, a commit, or a file in the repo.
 
 Run the tests with `python -m unittest discover -s tests`.
