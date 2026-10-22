@@ -1,6 +1,6 @@
 # Recovery Desk (QuantScout Cloud space, standalone)
 
-An automated Capitulation-Recovery / Momentum watchlist built on the locked Rule 1/2/3 + Anti-Knife rulebook (v1.6.1). Screening and status updates only: **orders are OFF and there is no order code here.** Not trade advice. A human submits every order.
+An automated Capitulation-Recovery / Momentum watchlist built on the locked Rule 1/2/3 + Anti-Knife rulebook (v1.6.2). Screening and status updates only: **orders are OFF and there is no order code here.** Not trade advice. A human submits every order.
 
 This branch, `recovery-desk`, is the desk's home. It shares no code with the QuantScout engine on `main`. Its only footprint on `main` is one scheduler file, because GitHub runs schedules only from the default branch.
 

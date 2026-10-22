@@ -360,8 +360,8 @@ class DataHub:
     def rth_volumes(self, symbols: List[str], start: date, end: date, basis: str = "SIP"
                     ) -> Tuple[Dict[str, Dict[str, float]], Dict[str, str]]:
         """Regular-hours volume per session and its source, one source per symbol.
-        SIP: 30-min SIP bars 09:30-16:00 ET. WEBULL: Webull RTH daily bars (the v1.6.1
-        locked basis). `basis` picks which one is tried first; the other is the fallback."""
+        SIP: 30-min SIP bars 09:30-16:00 ET. WEBULL: Webull RTH daily bars (the v1.6.2
+        fallback; it was the v1.6.1 basis). `basis` picks which one is tried first; the other is the fallback."""
         def sip(syms):
             s_dt = datetime(start.year, start.month, start.day, 9, 30, tzinfo=ET)
             e_dt = datetime(end.year, end.month, end.day, 16, 0, tzinfo=ET)

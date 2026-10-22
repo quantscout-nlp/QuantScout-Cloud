@@ -384,6 +384,18 @@ class HeldPositions(unittest.TestCase):
         with self.assertRaises(ValueError):
             held.parse_positions(b"name,value\nfoo,1\n")
 
+    def test_per_name_book_is_carried_and_editable(self):
+        pos, _, _ = held.parse_positions(b"symbol,qty,avg_cost,book\nAAOI,40,117,\nAIG,5,78,Cap\nMU,2,100,\n")
+        previous = {"positions": [{"symbol": "AAOI", "book": "Cap"}, {"symbol": "AIG", "book": "Mom"},
+                                  {"symbol": "MU", "book": None}]}
+        carried = {p["symbol"]: p["book"] for p in held.carry_books(pos, previous)}
+        # Last saved choice fills a blank; the file's own column wins; no history stays blank (Auto).
+        self.assertEqual(carried, {"AAOI": "Cap", "AIG": "Cap", "MU": None})
+        edited = held.set_books(held.carry_books(pos, previous), {"AAOI": "Auto", "AIG": "Mom", "MU": "Cap"})
+        self.assertEqual({p["symbol"]: p["book"] for p in edited}, {"AAOI": None, "AIG": "Mom", "MU": "Cap"})
+        self.assertEqual(held.set_books(pos, {"MU": "bogus"})[2]["book"], None)   # junk never becomes a book
+        self.assertEqual(held.carry_books(pos, None), pos)
+
     def test_stop_block_follows_rule_text(self):
         now = datetime(2026, 10, 22, 8, 30, tzinfo=ET)
         tickers = {

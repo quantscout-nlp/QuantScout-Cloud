@@ -9,7 +9,7 @@ and Robinhood-style headers (Symbol, Quantity, Average Cost). Only symbol, qty,
 average cost, lot and an optional Cap/Mom book are kept. No account number is
 stored beyond a masked tail.
 
-Stop block, from the locked rule text (v1.6.1):
+Stop block, from the locked rule text (v1.6.1, unchanged in v1.6.2):
   Mom stop = last official close under SMA20. Cap stop = last official close under
   SMA50. EXIT_FLAG if under the stop. STOP_NOT_COMPUTED if the held name was not
   scanned. Flags are audit output. Human decides. Not an automatic flatten. Do not
@@ -145,6 +145,27 @@ def held_block(doc: Optional[dict], tickers: Dict[str, dict], live: Dict[str, fl
     return {"status": "BOOK_STALE" if age_days > STALE_DAYS else "OK", "uploaded_et": doc["uploaded_et"],
             "asof_et": doc.get("asof_et"), "account_mask": doc.get("account_mask"),
             "age_days": round(age_days, 1), "lines": lines, "counts": counts}
+
+
+BOOK_CHOICES = ("Auto", "Cap", "Mom")
+
+
+def carry_books(positions: List[dict], previous: Optional[dict]) -> List[dict]:
+    """Keep the Cap/Mom you set last time: a position with no book in the new file
+    takes the book saved for the same symbol in the previous held.json."""
+    prev = {p.get("symbol"): p.get("book") for p in (previous or {}).get("positions", [])
+            if p.get("book") in ("Cap", "Mom")}
+    return [{**p, "book": p.get("book") or prev.get(p["symbol"])} for p in positions]
+
+
+def set_books(positions: List[dict], choices: Dict[str, Optional[str]]) -> List[dict]:
+    """Apply per-name choices from the dashboard editor. 'Auto' (or blank) clears the
+    book so the desk decides (its own Cap/Mom book, else Mom)."""
+    out = []
+    for p in positions:
+        c = choices.get(p["symbol"], p.get("book"))
+        out.append({**p, "book": c if c in ("Cap", "Mom") else None})
+    return out
 
 
 def rh_fields(doc: Optional[dict]) -> Dict[str, dict]:

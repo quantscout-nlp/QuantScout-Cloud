@@ -93,7 +93,16 @@ def positions_panel():
         except ValueError as e:
             st.sidebar.error(f"Can't use this file: {e}")
             return
-        st.sidebar.dataframe(pd.DataFrame(positions), hide_index=True, height=220)
+        # Per-name Cap/Mom: start from the file, else last saved book for that symbol, else Auto.
+        positions = held.carry_books(positions, current if integrity != "TAMPERED" else None)
+        grid = pd.DataFrame([{**p, "book": p.get("book") or "Auto"} for p in positions])
+        edited = st.sidebar.data_editor(
+            grid, hide_index=True, height=260, key=f"book_editor_{up.name}_{up.size}",
+            disabled=[c for c in grid.columns if c != "book"],
+            column_config={"book": st.column_config.SelectboxColumn(
+                "book", options=list(held.BOOK_CHOICES), required=True,
+                help="Cap = stop under SMA50. Mom = stop under SMA20. Auto = desk's book, else Mom.")})
+        positions = held.set_books(positions, dict(zip(edited["symbol"], edited["book"])))
         for w in warnings[:10]:
             st.sidebar.caption(f"⚠️ {w}")
         if not ENV["RECOVERY_SNAPSHOT_KEY"]:
@@ -115,7 +124,7 @@ def stop_line(l: dict) -> str:
         return f"{l['ticker']} | STOP_NOT_COMPUTED | {l.get('reason', '')} | RH {l['qty']} {l['lot']}"
     cost = f" @ {l['avg_cost']:.2f}" if l.get("avg_cost") else ""
     rel = "<" if l["flag"] == "EXIT_FLAG" else ">="
-    return (f"{l['ticker']} | {l['book']} | {l['flag']} | close {l['close']:.2f} {rel} {l['stop_name']} "
+    return (f"{l['ticker']} | {l['book']} ({l.get('book_basis', 'file')}) | {l['flag']} | close {l['close']:.2f} {rel} {l['stop_name']} "
             f"{l['stop']:.2f} | RH {l['qty']}{cost} {l['lot']} | as-of {l['asof']}"
             + (f" | {l['live_note']}" if l.get("live_note") else ""))
 

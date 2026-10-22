@@ -49,7 +49,7 @@ Option A alone does refresh automatically, but it isn't real time. GitHub starts
 - **Webull.** Its 5-minute bars report `delay_minutes: 0`, so it is real time and a better live fallback than Massive Stocks Developer (15-minute delayed). Massive never feeds the live gates. Webull needs an OpenAPI App Key/Secret and an **OpenAPI market-data subscription**; without one it answers 403. If your account enforces Webull's 2FA token, also set `WEBULL_ACCESS_TOKEN`. The request signature reproduces Webull's official SDK exactly (a unit test checks this), so the desk installs none of Webull's trading code.
 - **RVOL20.** SIP is first and Webull is the fallback. Each ratio is built from **one** source and never mixed, and the label says which (`SIP_RTH` or `WEBULL_RTH`). IEX volume is partial, so it is never used for RVOL.
 - **The basis gap.** The ZS example on 7 October (0.817 Webull vs 0.763 SIP) is a 0.054 gap. That sits inside the `VOL_BORDERLINE` band of 0.72–0.88, so any name the gap could flip is already flagged for a manual look.
-- **This is a rule change.** Locked rule v1.6.1 says Webull RTH. Set `DESK_RVOL_BASIS=WEBULL` to go back to the locked basis. If you keep SIP, update the rulebook to v1.6.2 so the desktop and Surface 1 bots label names the same way.
+- **Locked as rule v1.6.2 (2026-10-22 15:05 ET).** SKILL.md, AGENT.md and README.md in the Drive rule folder carry the new basis and the new stamp: `Volume floor: RVOL20 >= 0.8x APPLIED (SIP RTH first, Webull RTH fallback; borderline 0.72 to 0.88)`. The v1.6.1 files are kept as `*_v1.6.1_superseded.md`. `DESK_RVOL_BASIS=WEBULL` still forces the old Webull-first basis if you ever need it.
 - **Not used:** yfinance (a scraper, throttled from cloud servers) and Seeking Alpha Pro (no API, and scraping is against its terms).
 
 ## 5. Robinhood positions
@@ -63,7 +63,7 @@ The desk can't use a Robinhood MCP connector:
 
 **Built instead: a read-only positions upload.** In the dashboard sidebar, *Robinhood positions*:
 
-1. Upload your book CSV. Every HITL layout is accepted (`rh_book_7190_LATEST.csv` and the dated files: `symbol` or `ticker`, `qty`, `avg_cost`, SEED/WHOLE in `seed_or_whole` / `type` / `seed_whole` / `note`), and so are Robinhood-style `Symbol, Quantity, Average Cost` headers. An optional `book` column (`Cap` / `Mom`) sets each name's stop.
+1. Upload your book CSV. Every HITL layout is accepted (`rh_book_7190_LATEST.csv` and the dated files: `symbol` or `ticker`, `qty`, `avg_cost`, SEED/WHOLE in `seed_or_whole` / `type` / `seed_whole` / `note`), and so are Robinhood-style `Symbol, Quantity, Average Cost` headers. An optional `book` column (`Cap` / `Mom`) sets each name's stop, and you can also set it per name in the preview (see step 4).
 2. Check the preview and any skipped-row warnings, then tap **Save**. The app writes a **signed** `held.json` to the desk folder. Only symbol, qty, average cost, lot and a masked account tail are kept.
 3. Within 5 minutes the desk prints the **held-name stop block**, exactly per the rule text:
    - **Mom stop:** official close under SMA20.
@@ -72,7 +72,7 @@ The desk can't use a Robinhood MCP connector:
    - **`STOP_NOT_COMPUTED`:** the name couldn't be scanned.
 
    Flags are audit output; you decide, and nothing is flattened automatically.
-4. Each name's stop basis comes from the file's `book` column if present, then the desk's own book (Cap or Mom). Otherwise it defaults to Mom / SMA20, the tighter stop (INTERPRETATION).
+4. **Per-name book.** The preview has an editable **book** column (`Auto` / `Cap` / `Mom`). It starts from the file's `book` column, else the book you saved last time for that symbol, else `Auto`. Change any name and Save; your choice is kept on the next upload, so you only set it once. `Auto` lets the desk decide: its own book (Cap or Mom) if the name is on it, otherwise Mom / SMA20, the tighter stop (INTERPRETATION). The stop block shows where each name's book came from (`file`, `desk` or `default`).
 5. Held names outside the 232 are scanned too, so their stops are computed. They don't join the watchlist, and "N of 232 scanned" is unchanged.
 6. Intraday, a held name trading under its stop gets a **LIVE … not official** note, never a flag.
 7. Watchlist rows show `rh_qty` / `rh_lot` (the Tier 2 EXTRA "RH qty @ cost or SEED").

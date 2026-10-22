@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 The locked rule text, as code. Source: Drive `SKILL.md` "capitulation-momentum-rules"
-v1.6.1 (locked 2026-10-09 22:08 ET). Thresholds live in RuleConfig so a future
+v1.6.2 (locked 2026-10-22 15:05 ET; v1.6.2 changes only the RVOL20 source: SIP RTH
+first, Webull RTH fallback, one source per ratio). Thresholds live in RuleConfig so a future
 lock changes one place. Where the rule text leaves a gap, the choice made here is
 marked INTERPRETATION so it can be reviewed.
 
