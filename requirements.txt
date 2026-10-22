@@ -1,0 +1,6 @@
+# Recovery Desk dashboard (recovery_app.py). Streamlit Community Cloud installs this
+# file automatically when the app points at the recovery-desk branch.
+-r requirements-worker.txt
+streamlit==1.66.1
+pandas==2.3.3
+streamlit-autorefresh==1.0.1

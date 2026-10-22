@@ -1,0 +1,26 @@
+name: Recovery Desk tests
+
+# Runs the desk's unit tests on every push / PR to the recovery-desk branch.
+# No secrets are available to this job and it can't write to the repo.
+on:
+  push:
+    branches: [recovery-desk]
+  pull_request:
+    branches: [recovery-desk]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements-worker.txt
+      - run: python -m unittest discover -s tests -v

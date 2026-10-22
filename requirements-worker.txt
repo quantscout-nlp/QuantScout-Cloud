@@ -1,0 +1,5 @@
+# Worker + GitHub failover job. Exact pins: a new release can't slip in unreviewed.
+# No trading SDKs and no scrapers (yfinance is optional and not installed in the cloud).
+requests==2.34.2
+google-auth==2.62.0
+tzdata==2026.5

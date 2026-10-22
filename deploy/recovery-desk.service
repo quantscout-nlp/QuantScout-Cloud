@@ -1,0 +1,35 @@
+# systemd unit for the always-on worker (Option B) on a small Linux VM.
+# Installed by deploy/setup_vm.sh. Runs as an unprivileged user with a read-only
+# view of the system; it only needs outbound HTTPS and no listening ports.
+[Unit]
+Description=Recovery Desk worker (screening only, orders OFF)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=desk
+Group=desk
+WorkingDirectory=/opt/recovery-desk/app
+EnvironmentFile=/etc/recovery-desk.env
+Environment=RECOVERY_ROLE=worker PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/recovery-desk/venv/bin/python scripts/run_recovery_desk.py --loop
+Restart=always
+RestartSec=30
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
