@@ -7,5 +7,3 @@ GoogleNews==1.6.16
 beautifulsoup4>=4.12,<5
 pytz>=2024.1
 streamlit-autorefresh==1.0.1
-google-auth>=2.29,<3
-tzdata>=2024.1

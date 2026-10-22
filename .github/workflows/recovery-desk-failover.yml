@@ -1,0 +1,71 @@
+name: Recovery Desk failover (screening only)
+
+# The Recovery Desk lives on its own branch, `recovery-desk`, and shares no code with
+# the QuantScout engine. This one file has to sit on the default branch because
+# GitHub only runs schedules from there. It checks out the recovery-desk branch
+# and runs one screening cycle. Orders stay OFF; the desk has no order code.
+#
+# Role: FAILOVER. The always-on worker is the primary. While the worker has
+# published in the last 10 minutes, this job stands down. If the worker goes
+# quiet, it takes over every 5 minutes, 12:00-21:59 UTC on weekdays (covers
+# 08:00 premarket to the postmarket rebuild in both EDT and EST). GitHub cron is
+# best effort: runs can start late or be skipped.
+#
+# Isolation: secrets come only from the `recovery-desk` GitHub Environment under
+# DESK_* names. The engine's repository secrets are never referenced here.
+on:
+  schedule:
+    - cron: '*/5 12-21 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Run now even if the always-on worker published recently
+        type: boolean
+        default: false
+
+concurrency:
+  group: recovery-desk
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    environment: recovery-desk
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: recovery-desk
+          persist-credentials: false
+
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements-worker.txt
+
+      - name: Install pinned dependencies
+        run: pip install -r requirements-worker.txt
+
+      - name: Run one desk cycle
+        env:
+          RECOVERY_ROLE: failover
+          RECOVERY_FORCE: ${{ inputs.force && '1' || '0' }}
+          ALPACA_ID: ${{ secrets.DESK_ALPACA_ID }}
+          ALPACA_SECRET: ${{ secrets.DESK_ALPACA_SECRET }}
+          WEBULL_APP_KEY: ${{ secrets.DESK_WEBULL_APP_KEY }}
+          WEBULL_APP_SECRET: ${{ secrets.DESK_WEBULL_APP_SECRET }}
+          POLYGON_KEY: ${{ secrets.DESK_MASSIVE_KEY }}
+          TIINGO_KEY: ${{ secrets.DESK_TIINGO_KEY }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.DESK_GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.DESK_GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.DESK_GOOGLE_OAUTH_REFRESH_TOKEN }}
+          RECOVERY_DRIVE_FOLDER_ID: ${{ secrets.DESK_DRIVE_FOLDER_ID }}
+          RECOVERY_SNAPSHOT_KEY: ${{ secrets.DESK_SNAPSHOT_KEY }}
+          RECOVERY_RVOL_BASIS: ${{ vars.DESK_RVOL_BASIS }}
+          RECOVERY_WASH_SALE: ${{ vars.DESK_WASH_SALE }}
+        # Logs are public on a public repo: the script prints counts and health only.
+        run: python scripts/run_recovery_desk.py
