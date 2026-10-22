@@ -13,6 +13,23 @@ Regime Aware Automated QuantScout-Cloud NLP Google Sentiment Analytic Tracking T
   submits Alpaca orders or advances the trial log — keeping it singular avoids
   the dashboard and the scheduled job racing each other into double orders.
 
+## Cloud Recovery Desk (screening only)
+
+An automated Capitulation-Recovery / Momentum watchlist based on the locked
+Rule 1/2/3 + Anti-Knife text. Each 5-minute cycle requalifies names from completed
+daily closes, scores Anti-Knife from today's completed 5-minute bars, blocks
+eligibility when the feed is stale, and records every status change. It never
+places orders.
+
+- **`recovery/`**: the rules, data feeds (Alpaca SIP first), and Drive storage.
+- **`scripts/run_recovery_desk.py`**: one cycle, or `--loop` for an always-on worker.
+- **`.github/workflows/recovery-desk.yml`**: every 5 minutes in US market hours.
+- **`pages/1_Recovery_Desk.py`**: read-only dashboard page with health badges and Refresh now.
+
+Output goes to a private Google Drive folder, never to this public repo. For the
+assessment, data-feed choices, hosting trade-offs and setup steps, see
+[`docs/RECOVERY_DESK_CLOUD.md`](docs/RECOVERY_DESK_CLOUD.md).
+
 ## 60-day trial
 
 The engine runs a fixed rollout before any live-trading decision:

@@ -1,0 +1,17 @@
+# Always-on Recovery Desk worker: one screening cycle right after each 5-minute
+# bar closes, 08:00-16:30 ET on weekdays. Screening only; orders stay OFF.
+#
+#   docker build -f Dockerfile.recovery -t recovery-desk .
+#   docker run --env-file recovery.env recovery-desk
+#
+# recovery.env holds the same names as the GitHub Actions secrets
+# (ALPACA_ID, ALPACA_SECRET, POLYGON_KEY, TIINGO_KEY, GOOGLE_OAUTH_*,
+# RECOVERY_DRIVE_FOLDER_ID, RECOVERY_UNIVERSE_FILE_ID). Keep it out of git.
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements-recovery.txt .
+RUN pip install --no-cache-dir -r requirements-recovery.txt
+COPY recovery/ recovery/
+COPY scripts/run_recovery_desk.py scripts/
+ENV PYTHONUNBUFFERED=1
+CMD ["python", "scripts/run_recovery_desk.py", "--loop"]

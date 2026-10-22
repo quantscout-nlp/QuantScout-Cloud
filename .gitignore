@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 secrets.local.bat
+recovery_out/
+recovery.env
+client_secret*.json

@@ -1,0 +1,64 @@
+name: Recovery Desk (screening only)
+
+# Automated Capitulation-Recovery / Momentum watchlist. Screening and status
+# updates only: this job holds no order code and orders stay OFF.
+#
+# Runs every 5 minutes, 12:00-21:59 UTC on weekdays. That window covers 08:00 ET
+# premarket through the 16:00 ET close plus the postmarket rebuild in both EDT and
+# EST. The script reads the Alpaca market calendar and does nothing useful outside
+# the session (holidays, early closes).
+#
+# GitHub cron is best effort: a run can start several minutes late or be skipped
+# when GitHub is busy. For bar-close timing, run scripts/run_recovery_desk.py
+# --loop on an always-on host instead (see docs/RECOVERY_DESK_CLOUD.md).
+#
+# This repository is public, so its Actions logs are public too. The script
+# prints counts and health only, and all output goes to a private Google Drive
+# folder. Nothing is committed back here and no workflow artifacts are uploaded.
+on:
+  schedule:
+    - cron: '*/5 12-21 * * 1-5'
+  workflow_dispatch: {}
+
+concurrency:
+  group: recovery-desk
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements-recovery.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-recovery.txt
+
+      - name: Run one desk cycle
+        env:
+          ALPACA_ID: ${{ secrets.ALPACA_ID }}
+          ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
+          POLYGON_KEY: ${{ secrets.POLYGON_KEY }}
+          TIINGO_KEY: ${{ secrets.TIINGO_KEY }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+          # Secrets rather than variables: Drive IDs shouldn't show in public logs.
+          RECOVERY_DRIVE_FOLDER_ID: ${{ secrets.RECOVERY_DRIVE_FOLDER_ID }}
+          RECOVERY_UNIVERSE_FILE_ID: ${{ secrets.RECOVERY_UNIVERSE_FILE_ID }}
+          RECOVERY_WASH_SALE: ${{ vars.RECOVERY_WASH_SALE }}
+        run: |
+          if [ -z "$RECOVERY_DRIVE_FOLDER_ID" ]; then
+            echo "RECOVERY_DRIVE_FOLDER_ID is not set. Refusing to run without private storage."
+            exit 1
+          fi
+          python scripts/run_recovery_desk.py
