@@ -61,7 +61,22 @@ The desk can't use a Robinhood MCP connector:
 - Robinhood has no official equities API.
 - Giving an unattended server a brokerage login would undo the safety model, which is read-only data with orders OFF.
 
-Safe alternative: a read-only positions file. You (or the desktop HITL plane) upload the Robinhood positions CSV through the dashboard. The desk then prints the held-name stop block (`EXIT_FLAG` / `STOP_NOT_COMPUTED`). This part isn't built yet.
+**Built instead: a read-only positions upload.** In the dashboard sidebar, *Robinhood positions*:
+
+1. Upload your book CSV. Every HITL layout is accepted (`rh_book_7190_LATEST.csv` and the dated files: `symbol` or `ticker`, `qty`, `avg_cost`, SEED/WHOLE in `seed_or_whole` / `type` / `seed_whole` / `note`), and so are Robinhood-style `Symbol, Quantity, Average Cost` headers. An optional `book` column (`Cap` / `Mom`) sets each name's stop.
+2. Check the preview and any skipped-row warnings, then tap **Save**. The app writes a **signed** `held.json` to the desk folder. Only symbol, qty, average cost, lot and a masked account tail are kept.
+3. Within 5 minutes the desk prints the **held-name stop block**, exactly per the rule text:
+   - **Mom stop:** official close under SMA20.
+   - **Cap stop:** official close under SMA50.
+   - **`EXIT_FLAG`:** the official close is under the stop.
+   - **`STOP_NOT_COMPUTED`:** the name couldn't be scanned.
+
+   Flags are audit output; you decide, and nothing is flattened automatically.
+4. Each name's stop basis comes from the file's `book` column if present, then the desk's own book (Cap or Mom). Otherwise it defaults to Mom / SMA20, the tighter stop (INTERPRETATION).
+5. Held names outside the 232 are scanned too, so their stops are computed. They don't join the watchlist, and "N of 232 scanned" is unchanged.
+6. Intraday, a held name trading under its stop gets a **LIVE … not official** note, never a flag.
+7. Watchlist rows show `rh_qty` / `rh_lot` (the Tier 2 EXTRA "RH qty @ cost or SEED").
+8. A book older than 3 days shows **BOOK_STALE**. **Clear saved positions** removes it.
 
 ## 6. Statuses
 

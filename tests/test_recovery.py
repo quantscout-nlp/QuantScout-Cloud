@@ -8,7 +8,7 @@ import unittest
 from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from recovery import desk, indicators as ind, rules
+from recovery import desk, held, indicators as ind, rules
 from recovery.providers import ET, DataHub, parse_webull_bars, webull_signed_headers
 from recovery.store import LocalStore
 
@@ -351,3 +351,77 @@ class Safety(unittest.TestCase):
             forced = desk.run_cycle(store, FakeHub(daily, {}), now + timedelta(minutes=16),
                                     {**failover, "RECOVERY_FORCE": "1"})
             self.assertIsNotNone(forced)
+
+
+class HeldPositions(unittest.TestCase):
+    # Header layouts copied from the HITL rh_book_7190_*.csv files in Drive.
+    LAYOUTS = [
+        "asof_et,symbol,qty,avg_cost,seed_or_whole,last,prior_close,unrealized_pct,source\n"
+        "2026-10-21 15:32 ET,AAOI,40.100000,117.650000,SEED,77.69,76.74,-33.97,ROBINHOOD\n"
+        "2026-10-21 15:32 ET,AIG,5.000000,78.450000,WHOLE,81.29,81.88,3.62,ROBINHOOD\n",
+        "symbol,qty,avg_cost,type,account_mask\nAAOI,40.1,117.65,SEED,••••7190\nAIG,5,78.45,WHOLE,••••7190\n",
+        "ticker,qty,avg_cost,seed_whole\nAAOI,40.1,117.65,SEED\nAIG,5,78.45,WHOLE\n",
+        "symbol,qty,avg_cost,type,note\nAAOI,40.1,117.65,long,SEED\nAIG,5,78.45,long,WHOLE\n",
+        "Symbol,Quantity,Average Cost\nAAOI,40.1,$117.65\nAIG,5,78.45\n",
+    ]
+
+    def test_accepts_every_known_layout(self):
+        for text in self.LAYOUTS:
+            pos, meta, warnings = held.parse_positions(text.encode("utf-8"))
+            by = {p["symbol"]: p for p in pos}
+            self.assertEqual(by["AAOI"]["qty"], 40.1, text[:30])
+            self.assertEqual(by["AAOI"]["avg_cost"], 117.65)
+            self.assertEqual(by["AIG"]["lot"], "WHOLE")
+        # The file's own SEED label wins over the qty<1 default (AAOI 40.1 is marked SEED).
+        self.assertEqual(held.parse_positions(self.LAYOUTS[0].encode())[0][0]["lot"], "SEED")
+        self.assertEqual(held.parse_positions(self.LAYOUTS[1].encode())[1]["account_mask"], "••••7190")
+
+    def test_rejects_junk_and_merges_duplicates(self):
+        pos, _, warnings = held.parse_positions(
+            b"symbol,qty,avg_cost\n=CMD(),1,1\nTSLA,-3,1\nMU,10,100\nMU,10,200\n")
+        self.assertEqual([(p["symbol"], p["qty"], p["avg_cost"]) for p in pos], [("MU", 20.0, 150.0)])
+        self.assertEqual(len(warnings), 2)
+        with self.assertRaises(ValueError):
+            held.parse_positions(b"name,value\nfoo,1\n")
+
+    def test_stop_block_follows_rule_text(self):
+        now = datetime(2026, 10, 22, 8, 30, tzinfo=ET)
+        tickers = {
+            "MOM": {"status": "TIER2", "book": "Mom", "close": 95.0, "sma20": 100.0, "sma50": 90.0, "asof": "2026-10-21"},
+            "CAP": {"status": "CAP_SETUP", "book": "Cap", "close": 95.0, "sma20": 100.0, "sma50": 90.0, "asof": "2026-10-21"},
+            "UP": {"status": "TIER1", "book": "Mom", "close": 120.0, "sma20": 100.0, "sma50": 90.0, "asof": "2026-10-21"},
+            "GONE": {"status": "NOT_SCANNED", "reason": "insufficient daily bars"},
+        }
+        doc = {"uploaded_et": now.isoformat(), "positions": [
+            {"symbol": s, "qty": 1.0, "avg_cost": 100.0, "lot": "WHOLE", "book": None} for s in tickers]}
+        block = held.held_block(doc, tickers, {"UP": 99.0}, now)
+        flags = {l["ticker"]: l["flag"] for l in block["lines"]}
+        self.assertEqual(flags, {"MOM": "EXIT_FLAG", "CAP": "OK", "UP": "OK", "GONE": "STOP_NOT_COMPUTED"})
+        up = next(l for l in block["lines"] if l["ticker"] == "UP")
+        self.assertIn("not official", up["live_note"])            # intraday dip is a note, never a flag
+        stale = held.held_block(doc, tickers, {}, now + timedelta(days=4))
+        self.assertEqual(stale["status"], "BOOK_STALE")
+
+    def test_cycle_scans_held_names_without_adding_them_to_the_watchlist(self):
+        env = {"RECOVERY_UNIVERSE": "AAA", "RECOVERY_SNAPSHOT_KEY": "k" * 64}
+        daily = {"AAA": uptrend_bars(), "HLD": cap_bars()}
+        now = datetime(2026, 10, 22, 8, 30, tzinfo=ET)
+        doc = {"uploaded_et": now.isoformat(), "positions": [
+            {"symbol": "AAA", "qty": 0.1, "avg_cost": 50.0, "lot": "SEED", "book": None},
+            {"symbol": "HLD", "qty": 3.0, "avg_cost": 99.0, "lot": "WHOLE", "book": None},
+            {"symbol": "NODATA", "qty": 1.0, "avg_cost": 5.0, "lot": "WHOLE", "book": None}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            store = LocalStore(tmp)
+            store.write_text("held.json", desk.dump_signed(doc, env))
+            snap = desk.run_cycle(store, FakeHub(daily, {}), now, env)
+            self.assertEqual([r["ticker"] for r in snap["rows"]], ["AAA"])
+            self.assertEqual((snap["rows"][0]["rh_qty"], snap["rows"][0]["rh_lot"]), (0.1, "SEED"))
+            self.assertEqual(snap["health"]["scanned"], "1 of 1 scanned")
+            flags = {l["ticker"]: l["flag"] for l in snap["held"]["lines"]}
+            self.assertEqual(flags["NODATA"], "STOP_NOT_COMPUTED")
+            self.assertEqual(flags["HLD"], "OK")      # scanned: Cap book, official close above SMA50
+
+            store.write_text("held.json", json.dumps(doc))         # unsigned edit by something else
+            snap = desk.run_cycle(store, FakeHub(daily, {}), now + timedelta(minutes=5), env)
+            self.assertEqual(snap["held"]["status"], "NO_POSITIONS")
+            self.assertTrue(any("held.json" in e for e in snap["health"]["errors"]))

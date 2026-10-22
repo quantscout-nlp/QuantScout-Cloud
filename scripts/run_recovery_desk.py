@@ -35,6 +35,9 @@ def one_cycle(local_dir):
           f"{h['scanned']} qualified_from={snap['qualified_from_session']} delay_s={h['data_delay_s']} "
           f"calls={h['provider_calls']} 429s={h['rate_limited']} changes_today={len(snap['changes_today'])}")
     print("counts:", ", ".join(f"{k}={v}" for k, v in sorted(snap["counts"].items())))
+    hb = snap.get("held", {})
+    if hb.get("lines"):
+        print(f"held book: {hb['status']} " + ", ".join(f"{k}={v}" for k, v in sorted(hb["counts"].items())))
     if h["errors"]:
         # Messages name tickers, so they stay in the private snapshot (health.errors).
         print(f"errors: {len(h['errors'])} (see health.errors in latest.json)", file=sys.stderr)

@@ -9,6 +9,10 @@ It reads the signed snapshot that the always-on worker (or the GitHub failover
 schedule) publishes to the desk's private Drive folder. It never computes signals,
 never places orders, and refuses to show a snapshot whose signature doesn't verify.
 "Refresh now" only asks the GitHub failover workflow to run one screening cycle.
+
+Its one write: the sidebar's Robinhood positions upload. It saves a signed,
+read-only copy of your book (symbol, qty, average cost, lot) to the desk folder.
+The desk uses it for the held-name stop block. Nothing is ever sent to Robinhood.
 """
 import os
 import sys
@@ -19,7 +23,8 @@ import requests
 import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from recovery.desk import load_signed
+from recovery import held
+from recovery.desk import dump_signed, load_signed
 from recovery.providers import ET
 from recovery.store import open_store
 
@@ -33,7 +38,20 @@ st.set_page_config(page_title="Recovery Desk", layout="wide", page_icon="🧭")
 KEYS = ["RECOVERY_DRIVE_FOLDER_ID", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET",
         "GOOGLE_OAUTH_REFRESH_TOKEN", "GOOGLE_SERVICE_ACCOUNT_JSON", "RECOVERY_LOCAL_DIR", "GITHUB_TOKEN",
         "RECOVERY_SNAPSHOT_KEY"]
-ENV = {k: (st.secrets[k] if k in st.secrets else os.environ.get(k, "")) for k in KEYS}
+
+
+def _secret(k: str) -> str:
+    """App secrets on Streamlit Cloud, environment variables for a local run.
+    Streamlit raises when no secrets.toml exists at all, so that counts as 'not set'."""
+    try:
+        if k in st.secrets:
+            return str(st.secrets[k])
+    except Exception:  # noqa: BLE001 - StreamlitSecretNotFoundError when no secrets file exists
+        pass
+    return os.environ.get(k, "")
+
+
+ENV = {k: _secret(k) for k in KEYS}
 REPO = "quantscout-nlp/QuantScout-Cloud"
 SECTIONS = [
     ("TIER1", "Tier 1 — Top Daily Tradable Winners (Strong Buy/Buy) — Paper candidate only"),
@@ -46,13 +64,65 @@ SECTIONS = [
     ("NOT_SCANNED", "NOT_SCANNED — no qualifying data (never a silent pass)"),
 ]
 COLS = ["ticker", "paper_candidate", "blocked_by", "fail_gate", "dd_pct", "close", "chg_pct", "battery",
-        "rsi0", "rvol_label", "ak_d", "ak_s", "ak_combined", "live_last", "vwap", "stop", "live_flags", "news"]
+        "rsi0", "rvol_label", "ak_d", "ak_s", "ak_combined", "live_last", "vwap", "stop", "live_flags", "news",
+        "rh_qty", "rh_lot"]
+
+
+def desk_store():
+    return open_store(env=ENV, local_dir=ENV["RECOVERY_LOCAL_DIR"] or "recovery_out")
+
+
+def positions_panel():
+    """Sidebar: upload, preview, save or clear the Robinhood book (read-only copy)."""
+    st.sidebar.header("Robinhood positions")
+    st.sidebar.caption("Upload your rh_book CSV (or any CSV with symbol, qty, avg cost). Read-only: it only "
+                       "feeds the held-name stop block. Nothing is sent to Robinhood.")
+    try:
+        current, integrity = load_signed(desk_store().read_text("held.json"), ENV)
+    except Exception as e:  # noqa: BLE001 - storage not configured yet
+        st.sidebar.warning(f"Desk storage unavailable ({type(e).__name__}).")
+        return
+    if integrity == "TAMPERED":
+        st.sidebar.error("The saved book failed its signature check and is being ignored. Upload it again.")
+    elif current:
+        st.sidebar.success(f"{len(current['positions'])} positions saved {current['uploaded_et'][:16]} ET")
+    up = st.sidebar.file_uploader("Positions CSV", type=["csv"], accept_multiple_files=False)
+    if up is not None:
+        try:
+            positions, meta, warnings = held.parse_positions(up.getvalue())
+        except ValueError as e:
+            st.sidebar.error(f"Can't use this file: {e}")
+            return
+        st.sidebar.dataframe(pd.DataFrame(positions), hide_index=True, height=220)
+        for w in warnings[:10]:
+            st.sidebar.caption(f"⚠️ {w}")
+        if not ENV["RECOVERY_SNAPSHOT_KEY"]:
+            st.sidebar.error("Set RECOVERY_SNAPSHOT_KEY in app secrets first: the desk only trusts signed files.")
+        elif st.sidebar.button(f"Save {len(positions)} positions to the desk"):
+            doc = {"uploaded_et": datetime.now(ET).isoformat(), "asof_et": meta["asof_et"],
+                   "account_mask": meta["account_mask"], "source_name": up.name[:80], "positions": positions}
+            desk_store().write_text("held.json", dump_signed(doc, ENV))
+            st.cache_data.clear()
+            st.sidebar.success("Saved. The stop block updates on the desk's next cycle (within 5 minutes).")
+    if current and st.sidebar.button("Clear saved positions"):
+        desk_store().write_text("held.json", dump_signed({"uploaded_et": datetime.now(ET).isoformat(),
+                                                          "positions": []}, ENV))
+        st.sidebar.info("Cleared.")
+
+
+def stop_line(l: dict) -> str:
+    if l["flag"] == "STOP_NOT_COMPUTED":
+        return f"{l['ticker']} | STOP_NOT_COMPUTED | {l.get('reason', '')} | RH {l['qty']} {l['lot']}"
+    cost = f" @ {l['avg_cost']:.2f}" if l.get("avg_cost") else ""
+    rel = "<" if l["flag"] == "EXIT_FLAG" else ">="
+    return (f"{l['ticker']} | {l['book']} | {l['flag']} | close {l['close']:.2f} {rel} {l['stop_name']} "
+            f"{l['stop']:.2f} | RH {l['qty']}{cost} {l['lot']} | as-of {l['asof']}"
+            + (f" | {l['live_note']}" if l.get("live_note") else ""))
 
 
 @st.cache_data(ttl=55, show_spinner=False)
 def load_snapshot():
-    store = open_store(env=ENV, local_dir=ENV["RECOVERY_LOCAL_DIR"] or "recovery_out")
-    return load_signed(store.read_text("latest.json"), ENV)
+    return load_signed(desk_store().read_text("latest.json"), ENV)
 
 
 def dispatch_refresh() -> str:
@@ -68,6 +138,7 @@ def dispatch_refresh() -> str:
 if st_autorefresh:
     st_autorefresh(interval=60_000, key="desk_refresh")
 
+positions_panel()
 st.title("🧭 Recovery Desk")
 st.caption("Automated screening and status updates. Orders OFF — a human submits every order. Not trade advice.")
 
@@ -123,6 +194,22 @@ for status, title in SECTIONS:
         st.dataframe(part[[c for c in COLS if c in part.columns]], use_container_width=True, hide_index=True)
         if status != "NOT_SCANNED":
             st.code("\n".join(line for card in part["card"].dropna() for line in card), language=None)
+
+st.subheader("Held-name stop block")
+hb = snap.get("held") or {}
+if not hb.get("lines"):
+    st.caption("No Robinhood positions saved. Upload your book in the sidebar to get EXIT_FLAG / "
+               "STOP_NOT_COMPUTED lines.")
+else:
+    if hb["status"] == "BOOK_STALE":
+        st.warning(f"The saved book is {hb['age_days']} days old. Upload a fresh one: stops are only as good as it is.")
+    st.caption(f"Mom stop = official close under SMA20 · Cap stop = official close under SMA50 · audit flags, "
+               f"human decides, never an automatic flatten · book uploaded {hb['uploaded_et'][:16]} ET "
+               f"{hb.get('account_mask') or ''} · " + ", ".join(f"{k} {v}" for k, v in hb["counts"].items()))
+    flagged = [l for l in hb["lines"] if l["flag"] != "OK"]
+    st.code("\n".join(stop_line(l) for l in flagged) or "No held name is under its stop.", language=None)
+    with st.expander(f"All held names ({len(hb['lines'])})"):
+        st.dataframe(pd.DataFrame(hb["lines"]), use_container_width=True, hide_index=True)
 
 st.subheader("Classification changes today")
 if snap["changes_today"]:

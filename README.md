@@ -10,7 +10,8 @@ This branch, `recovery-desk`, is the desk's home. It shares no code with the Qua
 | `recovery/providers.py` | Alpaca SIP, then Webull (real time), then Massive / Tiingo for daily bars. Rate-limited; every row is labelled with its source |
 | `recovery/desk.py` | One cycle: daily qualification, live-session overlay, stale-feed guard, signed snapshot, change history |
 | `recovery/store.py` | The desk's private Google Drive folder (`drive.file` scope) |
-| `recovery_app.py` | The dashboard. Its own Streamlit app, read-only, shows signed snapshots only |
+| `recovery/held.py` | Robinhood positions upload parser and the held-name stop block (EXIT_FLAG / STOP_NOT_COMPUTED) |
+| `recovery_app.py` | The dashboard. Its own Streamlit app, shows signed snapshots only. Its one write is the Robinhood positions upload |
 | `scripts/run_recovery_desk.py` | `--loop` = always-on worker (primary); no flag = one cycle (GitHub failover) |
 | `scripts/google_drive_token.py` | One-time Google setup: creates the folder, uploads the universe, prints the secrets |
 | `deploy/`, `Dockerfile` | Hardened always-on worker (systemd sandbox or a read-only container) |

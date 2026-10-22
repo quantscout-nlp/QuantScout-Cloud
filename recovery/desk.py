@@ -23,7 +23,7 @@ import os
 from datetime import date, datetime, time, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from recovery import rules
+from recovery import held, rules
 from recovery.indicators import session_vwap
 from recovery.providers import ET, DataHub
 
@@ -211,11 +211,14 @@ def is_rth(b: dict, open_dt: datetime, close_dt: datetime) -> bool:
 
 
 def overlay(daily: dict, clock: dict, intraday: Dict[str, List[dict]], cfg: rules.RuleConfig,
-            feed_stale: bool) -> List[dict]:
+            feed_stale: bool, universe: Optional[List[str]] = None) -> List[dict]:
+    """Status rows for the watchlist universe. Held-only names are scanned for their
+    stops but never become watchlist rows."""
     phase, now = clock["phase"], clock["now"]
     in_session_day = phase in ("premarket", "open")
     out = []
-    for sym, d in daily["tickers"].items():
+    for sym in (universe if universe is not None else list(daily["tickers"])):
+        d = daily["tickers"][sym]
         row = {"ticker": sym, **d, "ak_d": "NOT_SCORED", "ak_s": "NOT_SCORED", "ak_combined": "NOT_SCORED",
                "vwap": None, "live_last": None, "today_low": None, "low_held_bars": None, "live_flags": [],
                "paper_candidate": False, "blocked_by": []}
@@ -306,14 +309,21 @@ def run_cycle(store, hub: DataHub, now: Optional[datetime] = None, env=os.enviro
     if not universe:
         errors.append("universe is empty: set RECOVERY_UNIVERSE or upload universe.csv to the desk folder")
 
+    # Robinhood book uploaded on the dashboard (signed). Held names outside the
+    # universe are scanned too, so their stops can be computed.
+    held_doc = _load_json(store, "held.json", None, env, errors)
+    held_syms = [p["symbol"] for p in (held_doc or {}).get("positions", [])
+                 if held.SYMBOL_RE.match(str(p.get("symbol", "")))]
+    scan = universe + [s for s in held_syms if s not in set(universe)] if universe else []
+
     daily = _load_json(store, "daily_cache.json", {}, env, errors)
     lc = clock["last_completed"]
-    if universe and lc and (daily.get("as_of_session") != lc.isoformat()
-                            or daily.get("universe_hash") != _uhash(universe)):
-        daily = build_daily(hub, universe, lc, cfg, now, env)
+    if scan and lc and (daily.get("as_of_session") != lc.isoformat()
+                        or daily.get("universe_hash") != _uhash(scan)):
+        daily = build_daily(hub, scan, lc, cfg, now, env)
         store.write_text("daily_cache.json", dump_signed(daily, env))
     daily.setdefault("tickers", {})
-    for sym in universe:
+    for sym in scan:
         daily["tickers"].setdefault(sym, {"status": "NOT_SCANNED", "reason": "not in daily cache"})
 
     intraday: Dict[str, List[dict]] = {}
@@ -323,7 +333,7 @@ def run_cycle(store, hub: DataHub, now: Optional[datetime] = None, env=os.enviro
     max_age = timedelta(seconds=int(env.get("RECOVERY_MAX_BAR_AGE_S", "600")))
     if clock["phase"] in ("premarket", "open") and universe:
         start = datetime.combine(now.date(), time(4, 0), ET)
-        intraday = hub.intraday_bars(universe, start, now)
+        intraday = hub.intraday_bars(scan, start, now)
         sources = dict(getattr(hub, "intraday_sources", {}))
         ends = [datetime.fromisoformat(b["t"]) + timedelta(minutes=5)
                 for rows in intraday.values() for b in rows if datetime.fromisoformat(b["t"]) + timedelta(minutes=5) <= now]
@@ -331,9 +341,18 @@ def run_cycle(store, hub: DataHub, now: Optional[datetime] = None, env=os.enviro
         if clock["phase"] == "open" and now - clock["open"] > timedelta(minutes=10):
             feed_stale = last_bar_end is None or now - last_bar_end > max_age
 
-    rows = overlay(daily, clock, intraday, cfg, feed_stale)
+    rows = overlay(daily, clock, intraday, cfg, feed_stale, universe)
+    rh = held.rh_fields(held_doc)
     for r in rows:
         r["intraday_source"] = sources.get(r["ticker"])
+        r.update(rh.get(r["ticker"], {"rh_qty": None, "rh_avg_cost": None, "rh_lot": None}))
+    live = {}
+    if clock["session_date"]:
+        for sym, bars in intraday.items():
+            done = completed_today(bars, clock["session_date"], now)
+            if done:
+                live[sym] = done[-1]["c"]
+    held_stops = held.held_block(held_doc, daily["tickers"], live, now)
 
     # ---- diff vs last publish
     prev = state.get("statuses", {})
@@ -396,7 +415,7 @@ def run_cycle(store, hub: DataHub, now: Optional[datetime] = None, env=os.enviro
             "scanned": f"{scanned} of {len(universe)} scanned", "errors": errors[:10],
             "daily_built_et": daily.get("built_et"),
         },
-        "counts": counts, "rows": rows, "changes_today": todays[-100:],
+        "counts": counts, "rows": rows, "changes_today": todays[-100:], "held": held_stops,
     }
     store.write_text("latest.json", dump_signed(snap, env))
     store.write_text("latest.csv", to_csv(rows), "text/csv")
@@ -413,7 +432,8 @@ CSV_COLS = ["ticker", "status", "paper_candidate", "blocked_by", "book", "fail_g
             "dd_band", "close", "chg_pct", "asof", "sma9", "sma20", "sma50", "sma200", "stack", "macd", "battery",
             "rsi0", "rsi1", "rvol_label", "vol_source", "graduate_rule2", "exit_flags", "stop_name", "stop",
             "ak_d", "ak_s", "ak_combined", "vwap", "live_last", "today_low", "ref_low", "prior_low",
-            "low_held_bars", "live_flags", "news", "news_note", "eps_ttm", "daily_source", "intraday_source"]
+            "low_held_bars", "live_flags", "news", "news_note", "eps_ttm", "daily_source", "intraday_source",
+            "rh_qty", "rh_avg_cost", "rh_lot"]
 
 
 def to_csv(rows: List[dict]) -> str:
