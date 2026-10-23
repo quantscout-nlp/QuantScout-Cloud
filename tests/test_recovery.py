@@ -8,7 +8,9 @@ import unittest
 from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from recovery import desk, held, indicators as ind, rules
+import math
+
+from recovery import backtest, desk, held, indicators as ind, rules
 from recovery.providers import ET, DataHub, parse_webull_bars, webull_signed_headers
 from recovery.store import LocalStore
 
@@ -259,10 +261,6 @@ class Cycle(unittest.TestCase):
                 self.assertEqual(json.load(f)["orders"], "OFF")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class Webull(unittest.TestCase):
     def test_signature_matches_official_sdk(self):
         # Vector produced by webull-openapi-python-sdk 3.0.4's own signer with the same inputs.
@@ -437,3 +435,108 @@ class HeldPositions(unittest.TestCase):
             snap = desk.run_cycle(store, FakeHub(daily, {}), now + timedelta(minutes=5), env)
             self.assertEqual(snap["held"]["status"], "NO_POSITIONS")
             self.assertTrue(any("held.json" in e for e in snap["health"]["errors"]))
+
+
+def wave_bars(n=700, phase=0.0, end=date(2026, 10, 21)):
+    """Deterministic trend + cycles + wobble: produces TIER1, TIER2, CAP_SETUP and WATCH runs."""
+    days, d = [], end
+    while len(days) < n:
+        if d.weekday() < 5:
+            days.append(d)
+        d -= timedelta(days=1)
+    out, prev = [], 50.0
+    for i, x in enumerate(reversed(days)):
+        c = 50 * math.exp(0.0006 * i + 0.25 * math.sin(i / 40 + phase) + 0.03 * math.sin(i / 3.7 + phase))
+        t = datetime(x.year, x.month, x.day, tzinfo=ET)
+        out.append(bar(t, prev, max(prev, c) * 1.008, min(prev, c) * 0.992, c, 1e6 * (1 + 0.6 * math.sin(i / 6.1 + phase))))
+        prev = c
+    return out
+
+
+class Backtest(unittest.TestCase):
+    def test_statuses_are_point_in_time(self):
+        bars = wave_bars()
+        start = bars[300]["date"]
+        rows = backtest.scan_symbol(bars, CFG, start)
+        cut = 520
+        future = [dict(b) for b in bars]
+        for b in future[cut:]:                     # rewrite the future: a crash after session `cut`
+            b.update(o=b["o"] * 0.5, h=b["h"] * 0.5, l=b["l"] * 0.5, c=b["c"] * 0.5)
+        again = backtest.scan_symbol(future, CFG, start)
+        before = lambda rs: [(r["date"], r["status"], r["by_floor"]) for r in rs if r["i"] < cut]
+        self.assertEqual(before(rows), before(again))
+        self.assertGreater(len(before(rows)), 200)
+        self.assertTrue({"TIER1", "TIER2", "CAP_SETUP", "WATCH_HOLD"} <= {r["status"] for r in rows})
+
+    def test_matches_the_live_daily_build(self):
+        # The status for a session equals what build_daily would print from that session's window.
+        bars = wave_bars()
+        rows = backtest.scan_symbol(bars, CFG, bars[400]["date"])
+        r = rows[50]
+        cutoff = (date.fromisoformat(r["date"]) - timedelta(days=420)).isoformat()
+        win = [b for b in bars if cutoff <= b["date"] <= r["date"]]
+        c = rules.classify_daily(rules.daily_metrics(win, None, CFG, daily_source="DAILY"), CFG)
+        self.assertEqual(c["status"], r["status"])
+
+    def test_only_the_first_day_of_a_run_counts(self):
+        rows = [{"i": i, "status": s} for i, s in
+                [(1, "TIER1"), (2, "TIER1"), (3, "TIER2"), (4, "TIER1"), (6, "TIER1"), (7, "TIER1")]]
+        firsts = backtest.first_days(rows)
+        # The first scanned day may be mid-run, so it never counts; a gap at 5 starts a new run.
+        self.assertEqual([r["i"] for r in firsts["TIER1"]], [4, 6])
+        self.assertEqual([r["i"] for r in firsts["TIER2"]], [3])
+
+    def test_forward_returns_and_costs(self):
+        bars = [{"o": 10.0, "c": 10.0, "h": 10.0, "l": 10.0}, {"o": 10.0, "c": 11.0, "h": 11.0, "l": 9.5},
+                {"o": 11.0, "c": 12.0, "h": 12.5, "l": 11.0}]
+        f = backtest.forward(bars, 1, 10.0, False, 0.0005, horizons=(1, 2, 5))
+        self.assertAlmostEqual(f[1], 0.1 - 0.001)          # entry open 10 -> that day's close 11
+        self.assertAlmostEqual(f[2], 0.2 - 0.001)
+        self.assertIsNone(f[5])                            # not enough history yet
+        g = backtest.forward(bars, 1, 11.0, True, 0.0, horizons=(1,))
+        self.assertAlmostEqual(g[1], 12 / 11 - 1)          # close entry: first return is the next close
+
+    def test_rule3_exit_at_next_open_after_close_under_stop(self):
+        bars = [{"o": 100, "c": 100}, {"o": 100, "c": 104}, {"o": 104, "c": 97}, {"o": 95, "c": 96}]
+        by_i = {1: {"sma20": 98, "sma50": 90}, 2: {"sma20": 99, "sma50": 90}, 3: {"sma20": 99, "sma50": 90}}
+        t = backtest.rule3_trade(bars, by_i, 1, 100.0, False, "Mom", 0.0)
+        self.assertEqual((t["exit"], t["days"]), ("stop", 2))
+        self.assertAlmostEqual(t["ret"], -0.05)            # 97 < SMA20 99 on session 2, out at 95
+        cap = backtest.rule3_trade(bars, by_i, 1, 100.0, False, "Cap", 0.0, max_hold=2)
+        self.assertEqual((cap["exit"], cap["days"]), ("time", 2))
+        self.assertEqual(backtest.rule3_trade(bars, by_i, 1, 100.0, False, "Cap", 0.0)["exit"], "open")
+
+    def test_summary_bootstraps_by_month(self):
+        vals = [0.01 * ((i % 7) - 2) for i in range(120)]
+        months = [f"2025-{1 + i // 10:02d}" for i in range(120)]
+        s = backtest.summarize(vals, months, n_boot=400)
+        self.assertEqual(s["n"], 120)
+        self.assertEqual(s["months"], 12)
+        self.assertLessEqual(s["ci95"][0], s["mean"])
+        self.assertGreaterEqual(s["ci95"][1], s["mean"])
+        self.assertEqual(s, backtest.summarize(vals, months, n_boot=400))     # same seed, same answer
+        self.assertEqual(backtest.summarize([], []), {"n": 0})
+
+    def test_run_reports_excess_over_the_same_day_baseline(self):
+        data = {f"S{k}": wave_bars(phase=k * 0.9) for k in range(4)}
+        start, end = data["S0"][300]["date"], data["S0"][-1]["date"]
+        report, signals = backtest.run(data, CFG, start, end, cost_bps=5, n_boot=100)
+        self.assertEqual(report["symbols"], 4)
+        self.assertTrue(report["notes"])
+        self.assertGreater(report["statuses"]["TIER1"]["signals"], 0)
+        self.assertEqual(set(report["rvol_floor_sensitivity"]), {"0.70", "0.75", "0.80", "0.85", "0.90"})
+        s = next(x for x in signals if x["kind"] == "TIER1" and x["fwd"][10] is not None)
+        same_day = []
+        for bars in data.values():                         # recompute that day's baseline by hand
+            rows = backtest.scan_symbol(bars, CFG, start)
+            r = next((r for r in rows if r["date"] == s["date"]), None)
+            if r and r["i"] + 10 < len(bars):
+                e = r["i"] + 1
+                same_day.append(bars[e + 9]["c"] / bars[e]["o"] - 1 - 0.001)
+        self.assertAlmostEqual(s["excess"][10], s["fwd"][10] - sum(same_day) / len(same_day))
+        rows = backtest.signal_rows(signals)
+        self.assertFalse(any("@" in r["kind"] for r in rows))   # sensitivity copies stay out of the CSV
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -17,6 +17,7 @@ python -m unittest tests.test_recovery.AntiKnife      # one class
 python -m unittest tests.test_recovery.HeldPositions.test_per_name_book_is_carried_and_editable   # one test
 python scripts/run_recovery_desk.py --out recovery_out   # one cycle into a local folder instead of Drive
 python scripts/run_recovery_desk.py --loop               # always-on worker (sets RECOVERY_ROLE=worker)
+python scripts/run_backtest.py --out recovery_out        # tradability test (needs Alpaca keys; run on the VM, not public CI)
 RECOVERY_LOCAL_DIR=recovery_out streamlit run recovery_app.py
 ```
 
@@ -42,6 +43,12 @@ There is no linter or formatter config. CI (`.github/workflows/desk-tests.yml`) 
 - **Intraday:** Alpaca SIP (falls back to IEX on a subscription error), with Webull filling missing names.
 - **RVOL20:** `rth_volumes()` uses one source per ratio, never mixed. `RECOVERY_RVOL_BASIS` picks which is tried first: SIP by default, per rule v1.6.2.
 - **Webull:** requests are signed by `webull_signed_headers`, which re-implements Webull's official SDK signature. `tests/test_recovery.py::Webull` holds a fixed test vector; any change to the signing code must keep that vector passing.
+
+**Tradability test** (`recovery/backtest.py`, run by `scripts/run_backtest.py`). It calls the same `rules.daily_metrics` / `classify_daily` per historical session over the live 420-day window, so it scores the exact live logic. Keep it that way: never give the backtest its own copy of a rule.
+- It counts only the first day of a status run and enters at the next open.
+- It reports excess returns over the same-day average of all scanned names, with a month-clustered bootstrap range.
+- Its `NOTES` list the known differences from live (daily-bar RVOL, no AK-S); update them whenever the gap changes.
+- Its signals CSV names tickers, so it is written only to the private store.
 
 **Storage** (`recovery/store.py`). `DriveStore` uses an OAuth refresh token with the `drive.file` scope, so it can only see files the app created (the `Recovery_Desk_Cloud` folder). `LocalStore` is the stand-in for `--out` and for tests.
 - Every JSON the desk reads back goes through `desk.dump_signed` / `desk.load_signed`, an HMAC with `RECOVERY_SNAPSHOT_KEY`. A file that fails the check comes back as `TAMPERED` and is ignored, and the problem is reported in `health.errors`.

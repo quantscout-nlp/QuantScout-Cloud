@@ -129,6 +129,28 @@ def stop_line(l: dict) -> str:
             + (f" | {l['live_note']}" if l.get("live_note") else ""))
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def load_backtest():
+    return load_signed(desk_store().read_text("backtest_report.json"), ENV)
+
+
+def _pct(x):
+    return None if x is None else round(100 * x, 2)
+
+
+def evidence_rows(blocks: dict) -> pd.DataFrame:
+    out = []
+    for name, b in blocks.items():
+        ex, fw, r3 = b["excess"]["10"], b["fwd"]["10"], b["rule3"]
+        ci = ex.get("ci95")
+        out.append({"status": name, "signals": b["signals"],
+                    "excess 10d %": _pct(ex.get("mean")),
+                    "95% range %": f"{_pct(ci[0])} to {_pct(ci[1])}" if ci else "too few months",
+                    "hit 10d %": _pct(fw.get("hit")), "Rule 3 trade %": _pct(r3.get("mean")),
+                    "Rule 3 days": None if r3.get("avg_days") is None else round(r3["avg_days"], 1)})
+    return pd.DataFrame(out)
+
+
 @st.cache_data(ttl=55, show_spinner=False)
 def load_snapshot():
     return load_signed(desk_store().read_text("latest.json"), ENV)
@@ -219,6 +241,29 @@ else:
     st.code("\n".join(stop_line(l) for l in flagged) or "No held name is under its stop.", language=None)
     with st.expander(f"All held names ({len(hb['lines'])})"):
         st.dataframe(pd.DataFrame(hb["lines"]), use_container_width=True, hide_index=True)
+
+st.subheader("Backtest evidence")
+try:
+    bt, bt_integrity = load_backtest()
+except Exception:  # noqa: BLE001 - storage problems are already shown above
+    bt, bt_integrity = None, "MISSING"
+if bt_integrity == "TAMPERED":
+    st.error("backtest_report.json failed its signature check and is not shown. Run the backtest again.")
+elif not bt:
+    st.caption("No backtest yet. On the worker VM run scripts/run_backtest.py (see docs, Tradability test).")
+else:
+    st.caption(f"{bt['period']['start']} to {bt['period']['end']} · {bt['symbols']} names · "
+               f"{bt['name_days']:,} name-days · entry at the next open · {bt['cost_bps_per_side']} bps per side · "
+               f"excess = return minus the same-day average of every scanned name · generated {bt['generated_et'][:16]} ET")
+    st.markdown("**Is there an edge?** A status earns its keep when its excess return is above 0 "
+                "and the whole 95% range sits above 0.")
+    st.dataframe(evidence_rows(bt["statuses"]), use_container_width=True, hide_index=True)
+    with st.expander("RVOL20 floor sensitivity (Tier 1)"):
+        st.dataframe(evidence_rows(bt["rvol_floor_sensitivity"]).rename(columns={"status": "floor"}),
+                     use_container_width=True, hide_index=True)
+    with st.expander("Known differences from the live desk"):
+        for n in bt["notes"]:
+            st.caption(f"• {n}")
 
 st.subheader("Classification changes today")
 if snap["changes_today"]:

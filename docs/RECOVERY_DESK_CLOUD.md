@@ -137,3 +137,29 @@ These block a paper candidate: a non-session day, a stale feed, and the wash-sal
 Enter GitHub values at: repo → **Settings → Environments → New environment** `recovery-desk` → *Deployment branches*: selected branches, `main` → **Add environment secret** (one per row). Never paste a key into a chat, an issue, a commit, or a file in the repo.
 
 Run the tests with `python -m unittest discover -s tests`.
+
+## 8. Tradability test
+
+Does the desk have an edge? `scripts/run_backtest.py` replays the exact `recovery/rules.py` over history and measures what each status was worth afterwards. Your rulebook held backtests until 2026-10-16, so this is now in scope.
+
+**How it scores:**
+- **Point in time.** Each session's status uses only bars up to that session, over the same 420-day window the live desk uses.
+- **One entry per run.** Only the first day a name enters a status counts.
+- **Entry** at the next session's open; 0.05% cost per side by default.
+- **Forward returns** at 1, 5, 10 and 20 sessions, raw and in **excess** of the same-day average of every scanned name. Excess removes market moves and most of the universe's survivorship bias.
+- **Rule 3 trade:** hold until the first close under the stop (SMA20 Mom, SMA50 Cap), out at the next open, at most 60 sessions.
+- **95% range** from a bootstrap that resamples whole months, because signals on the same day move together.
+- **RVOL20 floor sensitivity:** Tier 1 at floors 0.70 to 0.90.
+
+**Known differences from live** (also printed on the dashboard): RVOL20 uses daily-bar volume, not SIP regular-hours volume; AK-S is not scored, so CAP_SETUP is shown raw and with AK-D held through the entry day; NEWS, EPS and the wash-sale list are not applied; the universe is today's names.
+
+**Run it on the worker VM** (results stay private; never in public CI):
+
+```
+sudo -u desk bash -c 'set -a; . /etc/recovery-desk.env; set +a; cd /opt/recovery-desk/app && /opt/recovery-desk/venv/bin/python scripts/run_backtest.py'
+```
+
+It takes a few minutes. It writes a signed `backtest_report.json` (shown under **Backtest evidence** on the dashboard) and `backtest_signals.csv` (every signal, with tickers) to the desk's Drive folder. Options: `--years 3`, `--cost-bps 10`.
+
+**How to read it:** a status earns its keep when its excess return is above 0 and the whole 95% range sits above 0. A range that straddles 0 means the backtest cannot tell the status from chance.
+
