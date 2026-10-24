@@ -71,5 +71,6 @@ New behaviour in `rules.py`, `desk.py` or `held.py` needs a test here. Dashboard
 
 ## Further reading
 
+- `docs/STATUS.md`: setup progress, decisions and open items. Read it first in a new session, and update it when a step or phase completes.
 - `docs/RECOVERY_DESK_CLOUD.md`: cadence, feed table, Robinhood upload, setup steps, where each secret comes from.
 - `SECURITY.md`: threat model and checklist.
