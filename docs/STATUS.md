@@ -1,6 +1,6 @@
 # Recovery Desk — project status
 
-As of 2026-10-24. Update this file whenever a setup step or phase completes. No secrets, account identifiers or tickers belong here: the repository is public.
+As of 2026-10-26. Update this file whenever a setup step or phase completes. No secrets, account identifiers or tickers belong here: the repository is public.
 
 ## Built (on this branch, 35 tests green in CI)
 
@@ -8,7 +8,7 @@ As of 2026-10-24. Update this file whenever a setup step or phase completes. No 
 - Data feeds: Alpaca SIP first; Webull, Massive, Tiingo as optional fallbacks.
 - Safety: stale-feed block, signed files, tamper rejection, no order code.
 - Dashboard with tiers, change history, health line, Refresh button, Robinhood upload with per-name Cap/Mom book, held-name stop block, Backtest evidence.
-- Always-on worker plus the GitHub backup schedule (PR #6 to `main`, draft).
+- Always-on worker plus the GitHub backup schedule (merged to `main` 2026-10-26 via PR #6; runs every 5 minutes, 12:00–21:59 UTC on weekdays).
 - Hardened VM setup and the one-command e2-micro script (`deploy/`).
 - Tradability test (`scripts/run_backtest.py`); not yet run on real data.
 
@@ -18,9 +18,9 @@ As of 2026-10-24. Update this file whenever a setup step or phase completes. No 
 |---|---|
 | 1. Alpaca paper keys for the desk | Done |
 | 2. Google connection: Drive API, consent screen published to production, desktop client, token script run | Done |
-| 3. GitHub Environment `recovery-desk` with the `DESK_*` secrets and `DESK_RVOL_BASIS=SIP` | Next |
-| 4. Merge PR #6, then Actions → Recovery Desk failover → Run workflow (force = true) | After step 3 |
-| 6. Streamlit dashboard from this branch, private | After the first good run |
+| 3. GitHub Environment `recovery-desk` with the `DESK_*` secrets and `DESK_RVOL_BASIS=SIP` | Not visible to the workflow: the first run (2026-10-26 05:10 UTC) saw every secret and variable empty. Recheck names and environment |
+| 4. Merge PR #6, then Actions → Recovery Desk failover → Run workflow (force = true) | Merged 2026-10-26. First forced run refused safely (no Drive folder ID); rerun after step 3 is fixed |
+| 6. Streamlit dashboard from this branch, private | Next, after the first good run |
 | 5. Always-on e2-micro worker | After the dashboard |
 | Webull / Massive / Tiingo keys | Optional, later |
 
@@ -36,6 +36,9 @@ As of 2026-10-24. Update this file whenever a setup step or phase completes. No 
 - **AI models:** stay off the decision path; planned uses are research, engineering, a daily briefing and a weekly audit (Phase 3).
 
 ## Open items
+
+- Fix step 3 before the schedule starts (weekdays 12:00 UTC), or disable the workflow until then: every scheduled run fails while the secrets are missing.
+- The pinned checkout and setup-python actions target Node.js 20, which GitHub now forces onto Node.js 24 (warning only). Move to releases built for Node.js 24 at the next workflow change.
 
 - If the Google token script was run more than once, Drive holds more than one `Recovery_Desk_Cloud` folder: use the folder ID and refresh token from the last run; delete the older folder once the desk works.
 - No provider call has run against live keys yet; expect one round of fixes on the first run.
