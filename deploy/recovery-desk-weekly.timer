@@ -1,0 +1,11 @@
+# Every Saturday 09:00 New York time: the report for the week that just closed.
+# Persistent=yes runs a missed report once the VM is back up.
+[Unit]
+Description=Weekly Recovery Desk paper report
+
+[Timer]
+OnCalendar=Sat *-*-* 09:00:00 America/New_York
+Persistent=yes
+
+[Install]
+WantedBy=timers.target

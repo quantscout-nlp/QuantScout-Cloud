@@ -51,5 +51,5 @@ cat <<NEXT
 Installed. Two steps left:
   1. gcloud compute ssh $NAME --zone $ZONE
      sudo nano /etc/recovery-desk.env      (paste the desk values, no DESK_ prefix; Ctrl+O, Enter, Ctrl+X)
-  2. sudo systemctl enable --now recovery-desk && journalctl -u recovery-desk -f
+  2. sudo systemctl enable --now recovery-desk recovery-desk-weekly.timer && journalctl -u recovery-desk -f
 NEXT

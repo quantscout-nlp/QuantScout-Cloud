@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import math
 
-from recovery import backtest, desk, held, indicators as ind, rules
+from recovery import backtest, desk, held, indicators as ind, rules, weekly
 from recovery.providers import ET, DataHub, parse_webull_bars, webull_signed_headers
 from recovery.store import LocalStore
 
@@ -536,6 +536,73 @@ class Backtest(unittest.TestCase):
         self.assertAlmostEqual(s["excess"][10], s["fwd"][10] - sum(same_day) / len(same_day))
         rows = backtest.signal_rows(signals)
         self.assertFalse(any("@" in r["kind"] for r in rows))   # sensitivity copies stay out of the CSV
+
+
+class WeeklyReport(unittest.TestCase):
+    ENV = {"RECOVERY_SNAPSHOT_KEY": "k" * 64}
+    MON = date(2026, 11, 16)
+
+    def _bars(self, *days_ohlc):
+        return [{"date": d, "o": o, "h": max(o, c), "l": min(o, c), "c": c} for d, o, c in days_ohlc]
+
+    def _snap(self, day, rows):
+        return {"session_date": day, "health": {"status": "OK", "scanned": "2 of 2 scanned"},
+                "counts": {"TIER1": sum(r["status"] == "TIER1" for r in rows)}, "rows": rows}
+
+    def test_last_completed_week(self):
+        self.assertEqual(weekly.last_completed_week(date(2026, 11, 21)), self.MON)   # Saturday
+        self.assertEqual(weekly.last_completed_week(date(2026, 11, 23)), self.MON)   # next Monday
+        self.assertEqual(weekly.last_completed_week(date(2026, 11, 18)), date(2026, 11, 9))
+
+    def test_collect_reports_missing_days_and_drops_forged_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = LocalStore(tmp)
+            store.write_text("session_2026-11-17.json", desk.dump_signed(self._snap("2026-11-17", []), self.ENV))
+            store.write_text("changes_2026-11-17.jsonl", desk.dump_signed({"ticker": "AAA", "from": "WATCH_HOLD",
+                                                                            "to": "TIER1"}, self.ENV) + "\n" +
+                             json.dumps({"ticker": "BBB", "from": "x", "to": "TIER1"}) + "\n")
+            days = weekly.collect(store, self.MON, self.ENV)
+        self.assertEqual([d["integrity"] for d in days], ["MISSING", "VERIFIED", "MISSING", "MISSING", "MISSING"])
+        self.assertEqual([c["ticker"] for c in days[1]["changes"]], ["AAA"])
+        self.assertEqual(days[1]["dropped"], 1)
+
+    def test_ledger_enters_next_open_and_exits_after_close_under_stop(self):
+        row = lambda t, cand, close, stop: {"ticker": t, "status": "TIER1", "book": "Mom",
+                                            "paper_candidate": cand, "close": close, "stop": stop}
+        snaps = {
+            "2026-11-16": [row("AAA", False, 100, 95)],
+            "2026-11-17": [row("AAA", True, 102, 96), row("BBB", False, 50, 45)],   # AAA becomes a candidate
+            "2026-11-18": [row("AAA", True, 104, 97)],                             # still one: no second entry
+            "2026-11-19": [row("AAA", False, 96, 98)],                             # close under stop
+            "2026-11-20": [row("BBB", True, 52, 47)],                              # Friday: entry is next week
+        }
+        days = [{"date": d, "snap": self._snap(d, r), "integrity": "VERIFIED", "changes": [], "dropped": 0}
+                for d, r in snaps.items()]
+        bars = {"AAA": self._bars(("2026-11-17", 101, 102), ("2026-11-18", 103, 104), ("2026-11-19", 99, 96),
+                                  ("2026-11-20", 95, 97)),
+                "BBB": self._bars(("2026-11-20", 51, 52))}
+        trades = weekly.ledger(days, bars, notional=1000, cost_bps=0)
+        a = next(t for t in trades if t["ticker"] == "AAA")
+        self.assertEqual((a["entry_date"], a["entry"], a["state"], a["exit_date"], a["exit"]),
+                         ("2026-11-18", 103, "STOPPED", "2026-11-20", 95))
+        self.assertAlmostEqual(a["pnl"], 1000 * (95 / 103 - 1))
+        self.assertEqual(sum(t["ticker"] == "AAA" for t in trades), 1)
+        self.assertEqual(next(t for t in trades if t["ticker"] == "BBB")["state"], "PENDING_ENTRY")
+        pnl = weekly.pnl_by_day(trades, bars, list(snaps), 1000, 0)
+        self.assertEqual(pnl[:2], [None, None])                      # nothing held before Wednesday
+        self.assertAlmostEqual(pnl[2], 1000 * (104 / 103 - 1), places=2)
+        self.assertAlmostEqual(pnl[4], 1000 * (95 / 103 - 1), places=2)
+
+    def test_empty_week_renders_honestly_and_escapes(self):
+        days = [{"date": (self.MON + timedelta(days=i)).isoformat(), "snap": None, "integrity": "MISSING",
+                 "changes": [], "dropped": 0} for i in range(5)]
+        page = weekly.render(self.MON, days, [], [None] * 5, "2026-11-21 09:00", 1000, 5,
+                             ["<script>alert(1)</script>"], None)
+        self.assertIn("0 of 5", page)
+        self.assertEqual(page.count('<span class="bad">NOT CAPTURED</span>'), 5)
+        self.assertNotIn("<script>alert(1)</script>", page)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", page)
+        self.assertNotIn("http", page.split("<body>")[0].replace("http-equiv", ""))   # no external resources
 
 
 if __name__ == "__main__":

@@ -1,0 +1,30 @@
+# One-shot weekly paper report (scripts/weekly_report.py), started by
+# recovery-desk-weekly.timer. Same sandbox as the worker; outbound HTTPS only.
+[Unit]
+Description=Recovery Desk weekly paper report
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=desk
+Group=desk
+WorkingDirectory=/opt/recovery-desk/app
+EnvironmentFile=/etc/recovery-desk.env
+Environment=PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/recovery-desk/venv/bin/python scripts/weekly_report.py
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallArchitectures=native

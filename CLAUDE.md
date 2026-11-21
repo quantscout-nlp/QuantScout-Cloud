@@ -29,6 +29,7 @@ python -m unittest tests.test_recovery.AntiKnife               # one class
 python scripts/run_recovery_desk.py --out recovery_out         # one cycle into a local folder
 python scripts/run_recovery_desk.py --loop                     # always-on worker (RECOVERY_ROLE=worker)
 python scripts/run_backtest.py --out recovery_out              # tradability test (needs Alpaca keys; VM only)
+python scripts/weekly_report.py --week 2026-11-16 --out recovery_out   # weekly paper report (HTML)
 RECOVERY_LOCAL_DIR=recovery_out streamlit run recovery_app.py  # dashboard
 ```
 Python 3.11 (CI, `.github/workflows/desk-tests.yml`). No linter config. Dependencies are exact-pinned and actions SHA-pinned; keep it that way.
@@ -55,6 +56,7 @@ Python 3.11 (CI, `.github/workflows/desk-tests.yml`). No linter config. Dependen
 - **Tradability test** (`recovery/backtest.py`, `scripts/run_backtest.py`): calls the same `daily_metrics` / `classify_daily`; never give it its own copy of a rule.
   - First day of a status run only; entry at the next open; excess over the same-day average; month-clustered bootstrap.
   - `NOTES` lists the known gaps from live (daily-bar RVOL, no AK-S); update them when the gap changes.
+- **Weekly report** (`recovery/weekly.py`, `scripts/weekly_report.py`, Saturday timer `deploy/recovery-desk-weekly.timer`): a self-contained HTML page from the week's signed `session_*.json` and `changes_*.jsonl`. Its hypothetical paper ledger enters at the next open after a name first becomes a Paper candidate and exits at the next open after its close falls under its stop. A day with no record is NOT CAPTURED, never estimated.
 - **Storage** (`recovery/store.py`): `DriveStore` (OAuth refresh token, `drive.file` scope, `Recovery_Desk_Cloud` folder) or `LocalStore`. Every persisted JSON goes through `desk.dump_signed` / `load_signed` (HMAC, `RECOVERY_SNAPSHOT_KEY`); new files must too.
 - **Dashboard** (`recovery_app.py`): read-only over signed files. Its only write is the Robinhood upload (signed `held.json` with per-name Cap/Mom book). Refresh dispatches the backup workflow. Read secrets via `_secret()`.
 - **Deployment**: `deploy/create_vm_gcloud.sh` (Cloud Shell) → `deploy/setup_vm.sh` → hardened `deploy/recovery-desk.service`; `Dockerfile` is the alternative.

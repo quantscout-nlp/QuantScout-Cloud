@@ -112,7 +112,7 @@ These block a paper candidate: a non-session day, a stale feed, and the wash-sal
    bash create_vm_gcloud.sh
    ```
 
-   It creates the VM (e2-micro, Debian 12, 30 GB standard disk, us-east1-b, no service account, Shielded VM, OS Login) and runs `deploy/setup_vm.sh` on it. Then SSH in, fill `/etc/recovery-desk.env` (names in the table below), and run `sudo systemctl enable --now recovery-desk`.
+   It creates the VM (e2-micro, Debian 12, 30 GB standard disk, us-east1-b, no service account, Shielded VM, OS Login) and runs `deploy/setup_vm.sh` on it. Then SSH in, fill `/etc/recovery-desk.env` (names in the table below), and run `sudo systemctl enable --now recovery-desk recovery-desk-weekly.timer` (the worker, plus the Saturday weekly report).
 
    Free-tier limits: 1 e2-micro, 30 GB standard disk and 1 GB of outbound traffic a month (North America), in us-east1, us-central1 or us-west1 only. Google may bill the VM's external IPv4 address (about $0.005/hour, roughly $3.65/month). Check the first invoice and set a budget alert (Billing → Budgets & alerts, for example $5).
 6. **Dashboard.** In Streamlit Community Cloud, create a new app: repo `quantscout-nlp/QuantScout-Cloud`, branch `recovery-desk`, file `recovery_app.py`.
@@ -162,4 +162,20 @@ sudo -u desk bash -c 'set -a; . /etc/recovery-desk.env; set +a; cd /opt/recovery
 It takes a few minutes. It writes a signed `backtest_report.json` (shown under **Backtest evidence** on the dashboard) and `backtest_signals.csv` (every signal, with tickers) to the desk's Drive folder. Options: `--years 3`, `--cost-bps 10`.
 
 **How to read it:** a status earns its keep when its excess return is above 0 and the whole 95% range sits above 0. A range that straddles 0 means the backtest cannot tell the status from chance.
+
+## 9. Weekly paper report
+
+Every Saturday at 09:00 New York time, `deploy/recovery-desk-weekly.timer` runs `scripts/weekly_report.py` on the worker VM. It writes `weekly_report_YYYY-MM-DD.html` (the week's Monday) to the desk's Drive folder: one self-contained page with no external files or scripts. Download it and open it in any browser; it also works offline.
+
+**What it shows:**
+- Sessions captured (of 5), paper entries, stopped out, still open, winners, and the week's paper P/L, with a cumulative P/L line.
+- Tabs: each session's health and status counts, the paper ledger (sortable, filterable), status changes, held-name stop flags, and data-health notes.
+
+**How the paper ledger works** (the desk itself never trades):
+- **Entry:** a name that becomes a Paper candidate in a session's end-of-day record is bought at the next session's open.
+- **Exit:** sold at the next open after a later record shows its close under its stop (SMA20 Mom, SMA50 Cap). Otherwise it is marked at the week's last close and listed as open.
+- **Sizing and costs:** $1,000 per entry and 5 bps per side by default (`--notional`, `--cost-bps`).
+- **Missing data:** a day with no end-of-day record is shown as NOT CAPTURED and never estimated.
+
+Run it by hand for any week: `python scripts/weekly_report.py --week 2026-11-16` on the VM (add `--out DIR` for a local copy, `--note "..."` for an operator note).
 

@@ -4,7 +4,7 @@
 # and us-west1). Run as root:  sudo bash setup_vm.sh
 #
 # Afterwards: put the desk's secrets in /etc/recovery-desk.env (template created
-# below) and run  sudo systemctl enable --now recovery-desk
+# below) and run  sudo systemctl enable --now recovery-desk recovery-desk-weekly.timer
 # To update to a newer reviewed commit later:  sudo bash setup_vm.sh  (re-runs safely)
 set -euo pipefail
 
@@ -51,6 +51,8 @@ chown root:desk /etc/recovery-desk.env
 chmod 640 /etc/recovery-desk.env
 
 install -m 644 /opt/recovery-desk/app/deploy/recovery-desk.service /etc/systemd/system/recovery-desk.service
+install -m 644 /opt/recovery-desk/app/deploy/recovery-desk-weekly.service /etc/systemd/system/recovery-desk-weekly.service
+install -m 644 /opt/recovery-desk/app/deploy/recovery-desk-weekly.timer /etc/systemd/system/recovery-desk-weekly.timer
 systemctl daemon-reload
 systemctl restart recovery-desk 2>/dev/null || true
-echo "Fill /etc/recovery-desk.env, then: sudo systemctl enable --now recovery-desk && journalctl -u recovery-desk -f"
+echo "Fill /etc/recovery-desk.env, then: sudo systemctl enable --now recovery-desk recovery-desk-weekly.timer && journalctl -u recovery-desk -f"
