@@ -1,0 +1,1120 @@
+{
+  "schema_version": 2,
+  "as_of_session": "2026-09-04",
+  "session_type": "regular + post-market",
+  "next_regular_session": "2026-09-08",
+  "note_next_session": "2026-09-07 is Labor Day (US markets closed). The next tradeable open is Tuesday 2026-09-08, i.e. a 3-day-weekend gap.",
+  "market_context": {
+    "dow_close": 53414.25,
+    "dow_pct": -0.51,
+    "spx_close": 7718.6,
+    "spx_pct": -0.38,
+    "nasdaq_comp_close": 26506.99,
+    "nasdaq_comp_pct": -0.29,
+    "aug_nonfarm_payrolls": 162000,
+    "aug_nfp_consensus": 55000,
+    "unemployment_rate": 4.1,
+    "rate_regime": "HIKE_FEAR",
+    "rate_regime_note": "Strong payrolls lifted September rate-HIKE odds. 2-year yield hit its highest since Jan 2025. This is a tightening-scare tape, not a cutting tape.",
+    "dispersion_note": "Indices closed red while semi-cap equipment / memory closed +7% to +12%. That divergence -- not the index print -- is the tradeable fact of the session.",
+    "sector_laggards": [
+      "XLV",
+      "XLY",
+      "XLC",
+      "XLE"
+    ],
+    "sources": [
+      "https://www.thestreet.com/stock-market-today/stock-market-today-dow-jones-sp-500-nasdaq-updates-sept-04-2026",
+      "https://www.cnbc.com/2026/09/03/stock-market-today-live-updates.html",
+      "https://www.washingtonpost.com/business/2026/09/04/stock-market-dow-nasdaq-jobs/b9e994e6-a89f-11f1-9e38-f705d048bd5a_story.html"
+    ]
+  },
+  "regulatory_context": {
+    "pdt_rule_status": "ELIMINATED",
+    "pdt_effective_date": "2026-06-04",
+    "pdt_note": "SEC approved removal of the $25,000 PDT minimum on 2026-04-14; FINRA set 2026-06-04 as the effective date. The $25k equity floor, the 4-trades-in-5-days counter and the 90-day freeze are gone, replaced by a risk-based intraday margin framework. Broker-dealers have an 18-month phase-in, so HOUSE requirements still vary -- confirm with the broker before sizing.",
+    "consequence": "The T+1 cash-account capital-partition model (fixed $4,000 per trade, risk cut to 0.20-0.50%) that one research source built the plan around is obsolete. On a margin account, size on RISK, not on settled-cash partitions.",
+    "sources": [
+      "https://www.schwab.com/learn/story/sec-approves-scrapping-25000-day-trader-minimum",
+      "https://www.finra.org/rules-guidance/notices",
+      "https://www.quantinsti.com/articles/finra-pdt-rule-removal-2026/"
+    ]
+  },
+  "chat_sources": [
+    {
+      "id": "grok",
+      "label": "Grok 4.6",
+      "transcript_supplied": true
+    },
+    {
+      "id": "claude",
+      "label": "Claude Sonnet 5.0",
+      "transcript_supplied": true
+    },
+    {
+      "id": "gemini",
+      "label": "Gemini 3.1 Pro",
+      "transcript_supplied": true
+    },
+    {
+      "id": "chatgpt",
+      "label": "ChatGPT 5.6",
+      "transcript_supplied": false
+    },
+    {
+      "id": "copilot",
+      "label": "Copilot",
+      "transcript_supplied": false
+    },
+    {
+      "id": "zoom",
+      "label": "Zoom AI",
+      "transcript_supplied": false
+    }
+  ],
+  "chat_sources_note": "Only three transcripts were actually supplied. ChatGPT / Copilot / Zoom rows are declared but carry no mentions -- consensus scores below are computed over 3 real sources, not 6. Add their tickers to the mentions arrays and re-run; nothing else has to change.",
+  "clusters": {
+    "ai_semicap": "Semi-cap equipment, test, probe, PCB, memory -- one AI-capex trade",
+    "ai_compute": "AI silicon, interconnect, servers -- same macro driver as ai_semicap",
+    "ai_power": "Datacenter power / fuel cells",
+    "crypto_ai_hybrid": "Bitcoin miners pivoting to AI datacenter capacity",
+    "precious_metals": "Gold miners / bullion proxies",
+    "enterprise_software": "SaaS / automation / design software",
+    "consumer_retail": "Apparel and discretionary retail",
+    "biotech": "Biotech and large-cap pharma",
+    "fintech_data": "Credit scoring / financial data",
+    "industrial_rental": "Construction equipment rental",
+    "ev_auto": "EV / auto"
+  },
+  "tickers": [
+    {
+      "symbol": "AEHR",
+      "name": "Aehr Test Systems",
+      "cluster": "ai_semicap",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 10.5,
+      "close": 84.3,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "Semi-cap test group rally; no single-name release identified",
+      "url": "https://www.benzinga.com/trading-ideas/movers/26/09/61632320/quanex-building-products-concrete-pumping-sandisk-and-other-big-stocks-moving-higher-on-friday",
+      "flags": [],
+      "weekend_delta": "headwind",
+      "weekend_note": "Higher oil -> hotter CPI (9/11) -> higher hike odds -> multiple compression, which lands hardest on high-multiple semis."
+    },
+    {
+      "symbol": "SMTC",
+      "name": "Semtech",
+      "cluster": "ai_semicap",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 9.22,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "Semi/analog group rally on AI infrastructure demand",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "headwind",
+      "weekend_note": "Same rate/multiple headwind as the rest of the semi-cap group."
+    },
+    {
+      "symbol": "UCTT",
+      "name": "Ultra Clean Holdings",
+      "cluster": "ai_semicap",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 8.77,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "Semi-cap subsystems; group move",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "headwind",
+      "weekend_note": "Same rate/multiple headwind as the rest of the semi-cap group."
+    },
+    {
+      "symbol": "SIMO",
+      "name": "Silicon Motion Technology",
+      "cluster": "ai_semicap",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 8.7,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "NAND controller maker; memory-cycle sympathy with SNDK",
+      "url": null,
+      "flags": [
+        "thesis_decelerating"
+      ],
+      "weekend_delta": "mixed",
+      "weekend_note": "NAND controller exposure -- inherits the same deceleration risk."
+    },
+    {
+      "symbol": "FORM",
+      "name": "FormFactor",
+      "cluster": "ai_semicap",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 7.38,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "Probe cards; semi-test group move",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "headwind",
+      "weekend_note": "Same rate/multiple headwind as the rest of the semi-cap group."
+    },
+    {
+      "symbol": "TTMI",
+      "name": "TTM Technologies",
+      "cluster": "ai_semicap",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 7.2,
+      "close": 123.74,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "PCB / AI-infrastructure and defense demand",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "headwind",
+      "weekend_note": "Rate headwind, partly offset by defense/PCB exposure with a live shooting conflict."
+    },
+    {
+      "symbol": "SNDK",
+      "name": "SanDisk",
+      "cluster": "ai_semicap",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [
+        "grok"
+      ],
+      "move_pct": 7.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Memory-cycle recovery, AI infrastructure demand, buyers after a pullback",
+      "url": "https://finance.yahoo.com/markets/stocks/articles/sandisk-sndk-soars-p-100-021124605.html",
+      "flags": [
+        "thesis_decelerating",
+        "move_size_disputed"
+      ],
+      "weekend_delta": "mixed",
+      "weekend_note": "NAND cycle intact but decelerating: TrendForce sees +10-15% this quarter vs the ~70% jump just ridden. Sources also disagree on Friday's move (+7% to +12%)."
+    },
+    {
+      "symbol": "COHU",
+      "name": "Cohu Inc",
+      "cluster": "ai_semicap",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 6.9,
+      "close": 49.17,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "Test handlers; semi-test group move",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "headwind",
+      "weekend_note": "Same rate/multiple headwind as the rest of the semi-cap group."
+    },
+    {
+      "symbol": "AMAT",
+      "name": "Applied Materials",
+      "cluster": "ai_semicap",
+      "universe": [],
+      "mentions": [
+        "grok",
+        "claude"
+      ],
+      "move_pct": null,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "unverified",
+      "catalyst": "Cited +2.8% premarket 9/4 (Grok); bullish analyst note dated ~Aug 6 (Claude, stale)",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "headwind",
+      "weekend_note": "Same rate/multiple headwind as the rest of the semi-cap group."
+    },
+    {
+      "symbol": "MU",
+      "name": "Micron Technology",
+      "cluster": "ai_semicap",
+      "universe": [],
+      "mentions": [
+        "grok"
+      ],
+      "move_pct": null,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "unverified",
+      "catalyst": "Named in the premarket memory/semis bid",
+      "url": null,
+      "flags": [
+        "thesis_decelerating"
+      ],
+      "weekend_delta": "mixed",
+      "weekend_note": "Same NAND deceleration; Micron itself flags tight supply beyond 2027."
+    },
+    {
+      "symbol": "CBRS",
+      "name": "Cerebras Systems",
+      "cluster": "ai_compute",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": 12.0,
+      "close": 214.0,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Analysts positive on NVDA's Hugging Face acquisition; new AI datacenter in Mikkeli, Finland announced 9/1",
+      "url": "https://www.tipranks.com/news/why-cerebras-stock-cbrs-is-soaring-today-sept-4-2026",
+      "flags": [
+        "insufficient_history"
+      ],
+      "flag_note": "IPO 2026-05-14 -> roughly 80 sessions of history by 9/4. A 200-day SMA cannot be computed. Short interest reported ~17%.",
+      "weekend_delta": "tailwind",
+      "weekend_note": "Rallied on the NVDA/HF read-through. Still disqualified on history -- no SMA200 exists."
+    },
+    {
+      "symbol": "DELL",
+      "name": "Dell Technologies",
+      "cluster": "ai_compute",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": 4.61,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "AI server demand; S&P 100 inclusion effective 2026-09-21",
+      "url": "https://www.stocktitan.net/news/BE/bloom-energy-illumina-and-everpure-set-to-join-s-p-500-others-to-a0i4hthbnifg.html",
+      "flags": [
+        "index_inclusion_bid"
+      ],
+      "flag_note": "An index-add bid is mechanical demand with a known end date (9/21), not momentum. It fades after the rebalance.",
+      "weekend_delta": "headwind",
+      "weekend_note": "Rate headwind; index-add demand still expires 9/21."
+    },
+    {
+      "symbol": "NVDA",
+      "name": "NVIDIA",
+      "cluster": "ai_compute",
+      "universe": [],
+      "mentions": [
+        "grok",
+        "claude",
+        "gemini"
+      ],
+      "move_pct": null,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Hugging Face acquisition plan cited as the sector driver on 9/4",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "tailwind",
+      "weekend_note": "Hugging Face deal confirmed at $12.93B, but close is H1 2027 pending regulatory approval."
+    },
+    {
+      "symbol": "AVGO",
+      "name": "Broadcom",
+      "cluster": "ai_compute",
+      "universe": [],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": -3.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Fell ~3% on 9/3 despite 221% AI revenue growth -- missed the high end of guidance; gross-margin/memory-cost concern",
+      "url": "https://www.benzinga.com/markets/tech/26/09/61599551/broadcom-ai-boom-memory-problem-gross-margin",
+      "flags": [],
+      "weekend_delta": "mixed",
+      "weekend_note": "Q3 AI revenue $16.7B (+221% YoY, +54% QoQ) is a strong fundamental datapoint that the stock ignored, falling ~3%. Fundamentals and tape disagree; trade the tape."
+    },
+    {
+      "symbol": "AMD",
+      "name": "Advanced Micro Devices",
+      "cluster": "ai_compute",
+      "universe": [],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": null,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "unverified",
+      "catalyst": "Screen membership only; no dated catalyst surfaced",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "ARM",
+      "name": "Arm Holdings",
+      "cluster": "ai_compute",
+      "universe": [],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": null,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "unverified",
+      "catalyst": "Only stale color (TSMC stake exit, late April); valuation flag, not a 9/4 signal",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "CRDO",
+      "name": "Credo Technology Group",
+      "cluster": "ai_compute",
+      "universe": [
+        "earnings"
+      ],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": 8.82,
+      "close": 282.82,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Q1 FY27 (rpt 9/1): EPS $1.20 vs $1.12, revenue $479M +115% YoY (record, beat $471.7M); Q2 guide $525-535M, >85% YoY growth. Optical revenue guided >$600M for FY27.",
+      "url": "https://investors.credosemi.com/news-events/news/news-details/2026/Credo-Technology-Group-Holding-Ltd-Reports-Fourth-Quarter-and-Fiscal-Year-2026-Financial-Results/default.aspx",
+      "flags": [
+        "move_date_ambiguous"
+      ],
+      "flag_note": "The +8.82% to $282.82 print is dated 'Monday' (pre-earnings positioning), not 9/4. One research source also mis-identified CRDO as 'Croda International' -- it is Credo Technology Group. Verify the post-earnings drift path on your own bars.",
+      "weekend_delta": "headwind",
+      "weekend_note": "Rate headwind against a genuinely strong FY27 guide; the +115% growth is real, the multiple is the risk."
+    },
+    {
+      "symbol": "SMCI",
+      "name": "Super Micro Computer",
+      "cluster": "ai_compute",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 7.0,
+      "close": 40.58,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "AI server group move",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "headwind",
+      "weekend_note": "Same rate/multiple headwind; AI-server demand unchanged."
+    },
+    {
+      "symbol": "HPE",
+      "name": "Hewlett Packard Enterprise",
+      "cluster": "ai_compute",
+      "universe": [],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": -4.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Fell 4% on 9/3 alongside AVGO while software led",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "BE",
+      "name": "Bloom Energy",
+      "cluster": "ai_power",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": 7.35,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "AI datacenter power demand; S&P 500 inclusion effective 2026-09-21",
+      "url": "https://www.stocktitan.net/news/BE/bloom-energy-illumina-and-everpure-set-to-join-s-p-500-others-to-a0i4hthbnifg.html",
+      "flags": [
+        "high_beta",
+        "index_inclusion_bid"
+      ],
+      "flag_note": "Up ~150% in 2026 and ~291% in 2025. One research source called it 'high-beta noise almost by design'. Index-add demand ends 9/21.",
+      "weekend_delta": "tailwind",
+      "weekend_note": "Distributed power gets a bid with oil elevated and energy security in the headlines. Index-add demand still expires 9/21."
+    },
+    {
+      "symbol": "IREN",
+      "name": "IREN Ltd",
+      "cluster": "crypto_ai_hybrid",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 7.27,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Added to MSCI USA Index; August bitcoin revenue ~$77M; new CFO",
+      "url": "https://finance.yahoo.com/news/iren-iren-added-msci-usa-152454878.html",
+      "flags": [
+        "dual_driver"
+      ],
+      "flag_note": "Trades on BOTH bitcoin and AI-datacenter narratives. Correlation flips depending on which is driving -- it is not a clean semis proxy.",
+      "weekend_delta": "adverse",
+      "weekend_note": "Risk-off weekend is typically bad for bitcoin, and its AI-datacenter leg does not offset that at the open. Dual driver now points two ways."
+    },
+    {
+      "symbol": "GOLD",
+      "name": "Barrick Gold",
+      "cluster": "precious_metals",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [
+        "gemini",
+        "claude"
+      ],
+      "move_pct": 11.21,
+      "close": 46.13,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Gold-miner strength; +$4.65 on the session",
+      "url": "https://www.morningstar.com/stocks/xnys/gold/quote",
+      "flags": [
+        "extended_group",
+        "gap_risk_high"
+      ],
+      "flag_note": "GDX ran ~35% in six weeks into 9/4 (roughly $76 -> $102.83 by 8/21). An +11% day inside an already-extended run is late-cycle, not early.",
+      "weekend_delta": "tailwind",
+      "weekend_note": "Weekend Iran escalation is a direct safe-haven catalyst on top of an +11.2% Friday. Catalyst real, entry probably gone -- expect a large gap."
+    },
+    {
+      "symbol": "EQPT",
+      "name": "EquipmentShare.com",
+      "cluster": "industrial_rental",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": null,
+      "close": 18.56,
+      "verified": false,
+      "catalyst_quality": "unverified",
+      "catalyst": "No 9/4 catalyst found",
+      "url": "https://www.nasdaq.com/market-activity/stocks/eqpt",
+      "flags": [
+        "insufficient_history",
+        "wrong_sector_tag",
+        "below_ipo_price"
+      ],
+      "flag_note": "MISLABELLED in the source screen. EQPT is EquipmentShare.com -- construction equipment rental, not semiconductor equipment. IPO 2026-01-23 at $24.50; trading ~$18.56 (roughly -24% from IPO). ~155 sessions of history -> no valid SMA200.",
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "IOT",
+      "name": "Samsara",
+      "cluster": "enterprise_software",
+      "universe": [],
+      "mentions": [
+        "grok",
+        "claude"
+      ],
+      "move_pct": 13.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Revenue beat $508M vs $483M est; +13% premarket 9/4",
+      "url": null,
+      "flags": [
+        "gap_extended"
+      ],
+      "flag_note": "A +13% premarket gap. Continuation needs post-open volume confirmation, not the gap itself.",
+      "weekend_delta": "headwind",
+      "weekend_note": "High-multiple software into a hotter-CPI setup, on top of an unresolved +13% gap."
+    },
+    {
+      "symbol": "MDB",
+      "name": "MongoDB",
+      "cluster": "enterprise_software",
+      "universe": [
+        "earnings"
+      ],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": -13.6,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Beat every estimate and RAISED guidance on 9/1, revenue +30.5% YoY -- then sold off 13.6% on 9/2",
+      "url": "https://finance.yahoo.com/markets/stocks/articles/mongodb-beat-every-estimate-raised-184053697.html",
+      "flags": [
+        "beat_and_fade"
+      ],
+      "flag_note": "The cleanest read in the whole set: a beat-and-raise that still got sold is the market telling you good news is priced in for this group.",
+      "weekend_delta": "headwind",
+      "weekend_note": "Beat-and-raise already sold once; a hawkish week does not repair that."
+    },
+    {
+      "symbol": "PATH",
+      "name": "UiPath",
+      "cluster": "enterprise_software",
+      "universe": [
+        "earnings",
+        "loser"
+      ],
+      "mentions": [
+        "grok"
+      ],
+      "move_pct": -16.4,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Q2 CY26 revenue $410.3M beat $397.9M, but Q3 guide ~$443M implies ~8% growth (roughly half of Q2 pace); billings $375.5M slightly missed",
+      "url": "https://247wallst.com/investing/2026/09/04/uipath-tumbles-14-as-guided-slowdown-overshadows-revenue-beat/",
+      "flags": [
+        "guide_down"
+      ],
+      "weekend_delta": "headwind",
+      "weekend_note": "Guide-down drift, now with a rate headwind on top."
+    },
+    {
+      "symbol": "ASAN",
+      "name": "Asana",
+      "cluster": "enterprise_software",
+      "universe": [
+        "earnings",
+        "loser"
+      ],
+      "mentions": [
+        "grok"
+      ],
+      "move_pct": -15.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Q2 EPS $0.10 vs $0.09 and revenue $216.4M vs $214.2M -- but Q3 EPS guide $0.08 vs $0.09 est",
+      "url": "https://seekingalpha.com/news/4640337-asana-guidewire-and-uipath-lead-enterprise-software-stocks-down-following-earnings",
+      "flags": [
+        "guide_down"
+      ],
+      "weekend_delta": "headwind",
+      "weekend_note": "Guide-down drift, now with a rate headwind on top."
+    },
+    {
+      "symbol": "GWRE",
+      "name": "Guidewire Software",
+      "cluster": "enterprise_software",
+      "universe": [
+        "loser"
+      ],
+      "mentions": [
+        "grok"
+      ],
+      "move_pct": null,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "Named with ASAN/PATH in the enterprise-software post-earnings decline",
+      "url": null,
+      "flags": [
+        "guide_down"
+      ],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "ADSK",
+      "name": "Autodesk",
+      "cluster": "enterprise_software",
+      "universe": [
+        "earnings"
+      ],
+      "mentions": [],
+      "move_pct": 9.1,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "unverified",
+      "catalyst": "Reported +9.1% on a Q2 adjusted EPS beat ($2.62 vs $2.44 est)",
+      "url": null,
+      "flags": [
+        "unverified_date"
+      ],
+      "flag_note": "Could not confirm this is the 2026 print rather than the FY2026 Q2 report filed in Aug 2025. Do not trade on it until the date is confirmed.",
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "ADBE",
+      "name": "Adobe",
+      "cluster": "enterprise_software",
+      "universe": [
+        "earnings"
+      ],
+      "mentions": [],
+      "move_pct": null,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Earnings 2026-09-10 (UPCOMING). Options price a +/-6.99% (~$19.96) move. RBC raised to $315; Morgan Stanley cut to Underweight / $240 on AI substitution risk to Creative Cloud.",
+      "url": "https://www.nasdaq.com/market-activity/stocks/adbe/earnings",
+      "flags": [
+        "earnings_ahead"
+      ],
+      "flag_note": "This is a FORWARD event, not a 9/4 result. Holding intraday risk into a binary is a different trade than momentum -- do not let it into a momentum watchlist unflagged.",
+      "weekend_delta": "headwind",
+      "weekend_note": "Reports 9/10 into an elevated-oil, hawkish setup, with Morgan Stanley already Underweight on AI substitution risk."
+    },
+    {
+      "symbol": "PLTR",
+      "name": "Palantir",
+      "cluster": "enterprise_software",
+      "universe": [],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": 3.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "Led software/AI-adjacent names +3% on 9/3 while chips lagged",
+      "url": "https://finance.yahoo.com/markets/stocks/articles/why-palantir-stock-could-jump-173935235.html",
+      "flags": [],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft",
+      "cluster": "enterprise_software",
+      "universe": [],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": 3.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "+3% on 9/3 in the software-over-chips rotation",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "META",
+      "name": "Meta Platforms",
+      "cluster": "enterprise_software",
+      "universe": [],
+      "mentions": [
+        "claude"
+      ],
+      "move_pct": 3.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "+3% on 9/3 in the software-over-chips rotation",
+      "url": null,
+      "flags": [],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "LULU",
+      "name": "Lululemon Athletica",
+      "cluster": "consumer_retail",
+      "universe": [
+        "loser",
+        "earnings"
+      ],
+      "mentions": [
+        "grok",
+        "claude"
+      ],
+      "move_pct": -18.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Cut FY sales guide again to $10.35-10.50B from $11.0-11.50B; China sales -4% YoY; Q3 EPS guide $0.93-0.98 on revenue $2.29-2.32B. Closed at 7-year lows.",
+      "url": "https://finance.yahoo.com/markets/stocks/articles/why-lululemon-lulu-shares-getting-232610777.html",
+      "flags": [
+        "knife",
+        "guide_down"
+      ],
+      "weekend_delta": "headwind",
+      "weekend_note": "Nothing over the weekend addresses the guidance cut or the China weakness."
+    },
+    {
+      "symbol": "OXM",
+      "name": "Oxford Industries",
+      "cluster": "consumer_retail",
+      "universe": [
+        "loser",
+        "earnings"
+      ],
+      "mentions": [
+        "grok"
+      ],
+      "move_pct": null,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Cut FY26 net sales to $1.43-1.47B from $1.48-1.51B and adjusted EPS to $1.60-2.00 from $2.30-2.70; Lilly Pulitzer softness",
+      "url": null,
+      "flags": [
+        "knife",
+        "guide_down"
+      ],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "FICO",
+      "name": "Fair Isaac",
+      "cluster": "fintech_data",
+      "universe": [
+        "loser"
+      ],
+      "mentions": [],
+      "move_pct": -21.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "FHFA Director Pulte directed Fannie/Freddie to approve all lenders to use VantageScore, effective immediately -- ends FICO's single-model mortgage monopoly. Down >44% YTD.",
+      "url": "https://www.bloomberg.com/news/articles/2026-09-04/fico-plunges-21-credit-bureaus-fall-as-pulte-renews-criticism",
+      "flags": [
+        "knife",
+        "regulatory_headline"
+      ],
+      "flag_note": "A political/regulatory repricing with no known floor and headline-driven follow-on risk. Structurally the worst candidate in the set for an intraday long.",
+      "weekend_delta": "headwind",
+      "weekend_note": "Regulatory repricing unresolved over the weekend; no floor established."
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla",
+      "cluster": "ev_auto",
+      "universe": [
+        "loser"
+      ],
+      "mentions": [],
+      "move_pct": -6.0,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "Fell >6% after the Cybercab launch -- worst day since 7/23",
+      "url": null,
+      "flags": [
+        "knife"
+      ],
+      "weekend_delta": "adverse",
+      "weekend_note": "Higher oil is nominally an EV tailwind, but a -6% post-Cybercab break is not a setup a macro headline repairs."
+    },
+    {
+      "symbol": "IONS",
+      "name": "Ionis Pharmaceuticals",
+      "cluster": "biotech",
+      "universe": [
+        "earnings",
+        "loser"
+      ],
+      "mentions": [],
+      "move_pct": -5.22,
+      "close": null,
+      "verified": true,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "FDA approved ZANVASTRO (RNA-targeted, Alexander disease) -- and the stock still fell 5.22% on the day, -6.89% over 7 days",
+      "url": "https://finance.yahoo.com/markets/stocks/articles/why-did-ionis-pharmaceuticals-ions-111336932.html",
+      "flags": [
+        "sell_the_news"
+      ],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "AMGN",
+      "name": "Amgen",
+      "cluster": "biotech",
+      "universe": [
+        "earnings"
+      ],
+      "mentions": [],
+      "move_pct": null,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "unverified",
+      "catalyst": "Q2 revenue +10%, non-GAAP EPS +4%; raised FY26 revenue guide midpoint by $1B to $38.8B and EPS midpoint by $0.50 to $22.90 -- but that is the Q2 report, not a 9/4 event",
+      "url": null,
+      "flags": [
+        "stale_catalyst"
+      ],
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "AOUT",
+      "name": "American Outdoor Brands",
+      "cluster": "consumer_retail",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [
+        "grok"
+      ],
+      "move_pct": 26.0,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "company_specific_dated",
+      "catalyst": "+26% premarket 9/4 on a Q1 beat and raised EBITDA guide; ~$125M market cap",
+      "url": null,
+      "flags": [
+        "microcap",
+        "gap_extended"
+      ],
+      "flag_note": "Roughly $125M market cap. Earnings gaps this size typically retrace 30-50% of the gap in the first hour. Liquidity will not absorb size.",
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "SOXL",
+      "name": "Direxion Daily Semiconductor Bull 3X",
+      "cluster": "ai_semicap",
+      "universe": [
+        "gainer"
+      ],
+      "mentions": [],
+      "move_pct": 9.0,
+      "close": 116.87,
+      "verified": true,
+      "catalyst_quality": "sector_sympathy",
+      "catalyst": "3x leveraged semis ETF; confirms the group move was broad, not single-name",
+      "url": null,
+      "flags": [
+        "leveraged_etf"
+      ],
+      "flag_note": "Daily-reset 3x product. Useful as a CONFIRMATION read on the group; decays on chop and is not a position to hold.",
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "SMH",
+      "name": "VanEck Semiconductor ETF",
+      "cluster": "ai_semicap",
+      "universe": [],
+      "mentions": [
+        "grok",
+        "claude"
+      ],
+      "move_pct": null,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "unverified",
+      "catalyst": "Cited ~$550.90 mid-session 9/4 after a $540.07 low and $551.58 high; ~18% below the 6/22 52-week high of $671.83",
+      "url": null,
+      "flags": [
+        "etf_reference"
+      ],
+      "flag_note": "Use as the group regime gauge, not a trade. Levels quoted by the source were explicitly flagged by it as unverified -- recompute from your own bars.",
+      "weekend_delta": "unchanged",
+      "weekend_note": "No weekend development found that changes the Friday read."
+    },
+    {
+      "symbol": "GDX",
+      "name": "VanEck Gold Miners ETF",
+      "cluster": "precious_metals",
+      "universe": [],
+      "mentions": [
+        "claude",
+        "gemini"
+      ],
+      "move_pct": null,
+      "close": null,
+      "verified": false,
+      "catalyst_quality": "unverified",
+      "catalyst": "Ran roughly $76 (early July) to $102.83 (8/21), ~35% in six weeks; gold futures -0.59% and silver -0.40% on 9/4 morning",
+      "url": null,
+      "flags": [
+        "etf_reference",
+        "extended_group",
+        "gap_risk_high"
+      ],
+      "weekend_delta": "tailwind",
+      "weekend_note": "Same catalyst as GOLD; regime gauge for the precious-metals cluster."
+    }
+  ],
+  "weekend_developments": {
+    "collected": "2026-09-06 (Sunday)",
+    "covers": "post-close 2026-09-04 through 2026-09-06; Monday 2026-09-07 is Labor Day",
+    "items": [
+      {
+        "id": "iran_tanker_strikes",
+        "date": "2026-09-05",
+        "headline": "US military destroyed/disabled three Iranian oil tankers after IRGC fired ballistic missiles at two US Navy warships (an aircraft carrier was targeted)",
+        "detail": "CENTCOM 'permanently disabled' two tankers and 'completely destroyed' a third, describing them as part of a multibillion-dollar shadow fleet funding the IRGC and its proxies. CENTCOM warned it will destroy Tehran's oil fleet if necessary. Strikes hit in the Gulf of Oman and near Kharg Island.",
+        "regime_impact": "RISK_OFF_ENERGY_SHOCK",
+        "affects_clusters": [
+          "precious_metals"
+        ],
+        "affects_tickers": [
+          "GOLD",
+          "GDX"
+        ],
+        "urls": [
+          "https://www.aljazeera.com/news/2026/9/5/us-says-it-hit-iran-oil-tankers-helping-finance-regional-proxies",
+          "https://fortune.com/2026/09/05/us-military-iranian-oil-tankers-navy-aircraft-carrier-destroyer/"
+        ]
+      },
+      {
+        "id": "hormuz_closed",
+        "date": "2026-09-05",
+        "headline": "Strait of Hormuz effectively closed to commercial shipping -- 6 transits recorded against a baseline of 85/day",
+        "detail": "Closed to routine commercial traffic since 2026-07-30 after a June US-Iran agreement broke down. ~25% of seaborne oil and ~20% of LNG normally transit it. Maersk, MSC, CMA CGM and Hapag-Lloyd have suspended transits; 150+ tankers anchored outside. Iran's parliament speaker says its forces control the strait and will not allow it reopened.",
+        "regime_impact": "ONGOING_NOT_NEW",
+        "note": "This is a continuing condition, not a weekend event. It is the backdrop the tanker strikes escalated, not a fresh catalyst -- do not double-count it.",
+        "urls": [
+          "https://en.wikipedia.org/wiki/2026_Strait_of_Hormuz_crisis"
+        ]
+      },
+      {
+        "id": "oil_elevated",
+        "date": "2026-09-05",
+        "headline": "WTI around $91, Brent around $95-96, roughly +$5 since hostilities renewed",
+        "detail": "Sources disagree on the exact post-strike print and one undated headline suggests WTI toward $105. Treat oil as ELEVATED and TRENDING UP with a wide error bar; do not trade off a specific level quoted here.",
+        "regime_impact": "INFLATION_UPSIDE",
+        "confidence": "directionally confident, level unverified",
+        "urls": [
+          "https://oilprice.com/Energy/Energy-General/Oil-Prices-Rally-as-US-Targets-Iranian-Tankers-in-New-Escalation.html"
+        ]
+      },
+      {
+        "id": "nvda_hf_confirmed",
+        "date": "2026-09-04",
+        "headline": "Nvidia CONFIRMED the Hugging Face acquisition at $12.93B",
+        "detail": "~$11.9B to shareholders plus up to $1B in equity retention. Expected to close in H1 2027, PENDING REGULATORY APPROVAL. This is the catalyst behind Friday's AI-complex bid (CBRS +12%).",
+        "regime_impact": "AI_CAPEX_CONFIRMED",
+        "affects_clusters": [
+          "ai_compute",
+          "ai_semicap"
+        ],
+        "affects_tickers": [
+          "NVDA",
+          "CBRS"
+        ],
+        "caveat": "Regulatory approval is not granted. A confirmed deal that still needs clearance is a headline risk in both directions, not a settled fact.",
+        "urls": [
+          "https://www.cnbc.com/2026/09/03/nvidia-agrees-to-buy-hugging-face-for-almost-13-billion-ai-expansion.html",
+          "https://www.benzinga.com/markets/prediction-markets/26/09/61610151/nvidia-hugging-face-12-9-billion-deal"
+        ]
+      },
+      {
+        "id": "avgo_ai_revenue",
+        "date": "2026-09-04",
+        "headline": "Broadcom fiscal Q3 AI semiconductor revenue $16.7B, +221% YoY and +54% sequentially",
+        "detail": "The AI-capex thesis is intact at the fundamental level even though AVGO's stock fell ~3% on the print. Fundamentals and price action point opposite ways here -- the price action is what you trade.",
+        "regime_impact": "AI_CAPEX_CONFIRMED",
+        "affects_tickers": [
+          "AVGO"
+        ],
+        "urls": [
+          "https://www.benzinga.com/markets/tech/26/09/61599551/broadcom-ai-boom-memory-problem-gross-margin"
+        ]
+      },
+      {
+        "id": "nand_deceleration",
+        "date": "2026-08-23",
+        "headline": "TrendForce sees NAND prices +10-15% this quarter, down from an estimated ~70% jump SanDisk just rode",
+        "detail": "Still-positive pricing, but a sharp DECELERATION in the rate of change -- which is what a momentum trade is actually long. Micron flags tight NAND/DRAM beyond 2027; 2026 DRAM revenue projected +246.6% and NAND +371.9%. Structural risk: YMTC and CXMT capacity expansion could pressure prices.",
+        "regime_impact": "THESIS_DECELERATING",
+        "affects_clusters": [
+          "ai_semicap"
+        ],
+        "affects_tickers": [
+          "SNDK",
+          "MU",
+          "SIMO"
+        ],
+        "urls": [
+          "https://www.fool.com/investing/2026/08/23/sandisk-rode-an-estimated-70-jump-in-nand-prices-trendforce-sees-10-to-15-this-quarter/"
+        ]
+      },
+      {
+        "id": "fed_hike_odds",
+        "date": "2026-09-04",
+        "headline": "September rate-HIKE odds rose after the payrolls beat; sources put them roughly 48-58%",
+        "detail": "CME FedWatch cited near 56% for a 25bp hike, Kalshi 48%, Polymarket 49%, and one post-payrolls read 58%. Before Warsh's remarks, a hold was near 70%. Sources disagree and are dated differently -- treat this as a coin flip, not a known number.",
+        "regime_impact": "RATE_HIKE_RISK",
+        "confidence": "wide dispersion across sources",
+        "urls": [
+          "https://www.cnbc.com/2026/08/28/-september-fed-decision-now-a-coin-flip-as-rate-hike-odds-increase.html"
+        ]
+      }
+    ],
+    "week_calendar": [
+      {
+        "date": "2026-09-07",
+        "event": "Labor Day -- US markets CLOSED"
+      },
+      {
+        "date": "2026-09-08",
+        "event": "First session after a 3-day weekend AND a weekend military escalation -- widest gap risk of the setup"
+      },
+      {
+        "date": "2026-09-08",
+        "event": "Goldman Sachs Communacopia + Technology Conference begins (runs 9/8-9/11) -- AI/semis headline risk all week"
+      },
+      {
+        "date": "2026-09-10",
+        "event": "ADBE earnings -- options price a +/-6.99% move"
+      },
+      {
+        "date": "2026-09-11",
+        "event": "August CPI, 8:30 AM ET -- the week's dominant macro event, with oil elevated going in"
+      },
+      {
+        "date": "2026-09-15",
+        "event": "FOMC begins (decision 9/16)"
+      }
+    ],
+    "net_read": "Friday was a single-driver tape: hawkish payrolls, yields up, indices down, semis up on relative strength. Tuesday opens with a SECOND driver stacked on it -- a weekend military escalation with oil elevated and Hormuz shut. Higher oil feeds the inflation print that lands Friday, which feeds the hike the FOMC decides the following week. That chain is a headwind for exactly the high-multiple growth names that dominate this watchlist, at the same time as it is a tailwind for the gold names at the top of the ranking. The two halves of this list now point in opposite directions, and that is the single most important change since Friday's close."
+  },
+  "as_of_updated": "2026-09-06"
+}

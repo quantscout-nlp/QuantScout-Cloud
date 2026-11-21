@@ -1,0 +1,113 @@
+{
+  "_note": "Evidence bundle for the week-1 paper-trading report. Every field was read from the GitHub Actions run list, the job logs those runs printed, the repository's branch list, or executed directly against engine.py from origin/main. Nothing is estimated.",
+  "title": "Week 1 paper trading: 25 engine runs, zero trades, zero preconditions met",
+  "week": "1",
+  "window": "2026-11-14 to 2026-11-20 (UTC, 7 full days)",
+  "runs_all_time": 440,
+  "orders": 0,
+  "trial_log_present": false,
+  "alpaca_label": "unconfigured",
+  "expected_runs": "96 runs/day (cron */15 * * * *)",
+  "throttle_note": "Observed 25 runs across 7 days -- about 3.6/day, roughly 3.7% of the requested cadence. GitHub throttles high-frequency schedules on shared runners, so the */15 cron is not a real every-15-minutes loop and never was.",
+  "runs_per_day": {
+    "2026-11-14": 5,
+    "2026-11-15": 4,
+    "2026-11-16": 3,
+    "2026-11-17": 3,
+    "2026-11-18": 3,
+    "2026-11-19": 4,
+    "2026-11-20": 3
+  },
+  "parsed_log": {
+    "_source": "run #419, job id 132632752997, 2026-11-14T23:53Z (full log read); the identical pattern was re-confirmed on run #440, job id 136687055860, 2026-11-21T01:51Z",
+    "phase": "DRY_RUN",
+    "trial_day": "None",
+    "trial_start": "None",
+    "open_symbols_raw": "[]",
+    "log_entries": 0,
+    "http_429": 43,
+    "warnings": [
+      "TRIAL_GITHUB_TOKEN not set \u2014 trial phase/log can't persist, engine will fail safe into DRY_RUN and this run will just be discarded state."
+    ],
+    "signal_lines": [],
+    "set_config": [],
+    "empty_config": [
+      "ALPACA_ID",
+      "ALPACA_SECRET",
+      "POLYGON_KEY",
+      "TIINGO_KEY",
+      "TRIAL_GITHUB_TOKEN",
+      "TG_TOKEN",
+      "TG_ID",
+      "WATCHLIST",
+      "ENABLE_TRADING",
+      "NOTIONAL_PER_TRADE",
+      "MAX_POSITIONS"
+    ]
+  },
+  "causal_chain": [
+    {
+      "step": "Every secret and variable reaches the engine empty",
+      "detail": "The Actions env block echoes each one with nothing after the colon. ENABLE_TRADING being empty is the one that looks harmless and is not: run_scan._env_bool falls back to True, so the engine believes trading is enabled while having no way to trade.",
+      "evidence": "ALPACA_ID:\nALPACA_SECRET:\nPOLYGON_KEY:\nTIINGO_KEY:\nTRIAL_GITHUB_TOKEN:\nWATCHLIST:\nENABLE_TRADING:\nNOTIONAL_PER_TRADE:\nMAX_POSITIONS:"
+    },
+    {
+      "step": "No price source can answer, so price is always None",
+      "detail": "Both fetchers short-circuit on the missing key before any network call. Executed directly against engine.py from origin/main:",
+      "evidence": "fetch_alpaca_price('AEHR','','')  -> (None, 'No Keys')\nfetch_polygon_price('AEHR','')    -> (None, 'No Key')"
+    },
+    {
+      "step": "The indicator fallback is rate-limited on every ticker",
+      "detail": "With no Alpaca keys, fetch_indicators_hybrid falls through to yfinance and is throttled. The 43 errors per run match engine.DEFAULT_TICKERS exactly -- 43 tickers, 43 refusals -- which also confirms WATCHLIST being empty means the built-in list is what runs.",
+      "evidence": "HTTP Error 429: Too Many Requests        x43 per run\nlen(engine.DEFAULT_TICKERS) == 43"
+    },
+    {
+      "step": "decide() therefore returns HOLD unconditionally",
+      "detail": "The function's first guard is `if price and rsi > 0`. price is None, so the guard never opens and no branch is reachable. This is not the strategy being cautious -- it is the strategy never being consulted.",
+      "evidence": "decide(None, 0.0, 0.0, 0.0)      -> ('HOLD', 0.0)   # observed every run\ndecide(100.0, 95.0, 55.0, 0.40) -> ('BUY', 0.84)    # same code, healthy inputs"
+    },
+    {
+      "step": "The trial phase is pinned to DRY_RUN permanently",
+      "detail": "Without TRIAL_GITHUB_TOKEN, get_trial_start_date() returns None, and get_trial_phase(None) returns DRY_RUN with no day counter. The 60-day clock has never started, which is why the log reads 'day None'. Day 31 -- when PAPER would begin -- is unreachable, not merely distant.",
+      "evidence": "Phase: DRY_RUN (day None) \u2014 started None\nget_trial_phase(None) -> ('DRY_RUN', None)"
+    },
+    {
+      "step": "Opening a position is impossible even if a signal fired",
+      "detail": "Two independent gates both fail: no broker credentials, and the wrong phase. Either one alone is sufficient to block every order.",
+      "evidence": "trading_base_ready = enable_trading AND alpaca_id AND alpaca_secret  -> False\ncan_open_new       = trading_base_ready AND phase == 'PAPER'         -> False\ncan_close          = trading_base_ready AND phase in (PAPER,REVIEW) -> False"
+    },
+    {
+      "step": "And nothing was recorded, so there is no history to analyse",
+      "detail": "Each run reports zero new log entries, and the branch the log would live on does not exist. 440 runs of state were computed and discarded. This report had to be reconstructed from Actions logs because the engine's own audit trail is empty.",
+      "evidence": "0 new trial-log entries this pass\nOpen positions/simulated holds: []\ngit ls-remote --heads origin bot-trial-log  ->  (no such branch)\nno trial_state/ path exists on any of the 9 remote branches"
+    }
+  ],
+  "fixes": [
+    {
+      "what": "Make a dead run fail instead of reporting success",
+      "how": "This is the real finding: 440 consecutive green runs concealed a total outage. Add an assertion at the end of run_scan.py -- if zero tickers produced a usable price, exit non-zero. A red workflow would have surfaced this on day one instead of week eleven. Do this first, because it is what protects every fix below."
+    },
+    {
+      "what": "Set ALPACA_ID and ALPACA_SECRET to the PAPER account keys",
+      "how": "Repo Settings -> Secrets and variables -> Actions. Paper keys only; live keys return 401 against the hardcoded paper endpoint, which is the intended safety behaviour. This unblocks both the price source and trading_base_ready."
+    },
+    {
+      "what": "Set TRIAL_LOG_TOKEN so the trial clock can start",
+      "how": "A fine-grained PAT scoped to this repo with Contents: Read and write. The engine reads it as TRIAL_GITHUB_TOKEN. On the first run with it set, get_trial_start_date() bootstraps today's date, creates the bot-trial-log branch, and the 60-day clock begins -- 30 days DRY_RUN, then PAPER. Until this exists, no amount of other configuration starts paper trading."
+    },
+    {
+      "what": "Give the indicator path a data source that is not rate-limited",
+      "how": "Set POLYGON_KEY and TIINGO_KEY, or have fetch_indicators_hybrid use the Alpaca bars endpoint once keys exist. 43 HTTP 429s per run means the free fallback is exhausted before it returns a single bar, so even with broker keys the RSI/SMA path needs its own fix."
+    },
+    {
+      "what": "Replace the */15 cron with a schedule GitHub will actually honour",
+      "how": "The requested 96 runs/day is delivering about 3.6. Pick an explicit market-hours schedule (e.g. every 30 minutes, 13:30-20:00 UTC, weekdays) so the cadence is predictable and the engine is not firing at 01:50 UTC when the market is shut."
+    },
+    {
+      "what": "Set WATCHLIST, NOTIONAL_PER_TRADE and MAX_POSITIONS explicitly",
+      "how": "All three are currently empty and running on code defaults (DEFAULT_TICKERS, $500, 8 positions). Defaults are fine as behaviour but invisible as configuration -- set them so the deployed values are stated rather than inferred."
+    }
+  ],
+  "scope_note": "Week 1 of paper trading has not happened. The scheduler fired 25 times in this window (440 all time) and every run completed successfully, but no run fetched a price, computed an indicator, produced a signal, placed an order, or recorded a decision. Every one of the 11 secrets and variables reaches the engine empty, which pins the trial phase to DRY_RUN and makes an order impossible on two independent gates. The zero in 'orders placed' is a plumbing outage, not a flat strategy week -- and because the engine's own log was never persisted, there is no trading history to evaluate.",
+  "alpaca_note": "The engine holds no broker credentials at all, so it has never connected to any account; its order endpoint is hardcoded to paper-api.alpaca.markets. Separately, the only Alpaca account reachable from the session that produced this report is a LIVE account (equity $9,368.67 as of 2026-11-19, holding one position: 19 INTU at an average entry of $289.81, marked at $273.15 for -$316.47 / -5.75%). That position is not on the bot's watchlist and was not opened by the bot. It is named here only to be explicit that no live figure anywhere in this report is bot activity, and that the bot's paper results are empty rather than hidden."
+}

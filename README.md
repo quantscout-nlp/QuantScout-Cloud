@@ -13,6 +13,43 @@ Regime Aware Automated QuantScout-Cloud NLP Google Sentiment Analytic Tracking T
   submits Alpaca orders or advances the trial log — keeping it singular avoids
   the dashboard and the scheduled job racing each other into double orders.
 
+## Research scan (Track A watchlist construction)
+
+A separate, offline-first layer that turns overlapping AI-chat research lists into a
+single ranked, deduped watchlist — and then decides which of those names are actually
+tradeable.
+
+- **`research/track_a_<session>.json`** — the source of record. Every ticker carries
+  its provenance: which chat sources mentioned it, which screen it came from, its
+  verified move, the dated catalyst, and a source URL. Hand-maintained on purpose;
+  it is data, not output.
+- **`research_scan.py`** — dedup + cross-source consensus scoring. Pure functions,
+  no clock, no network, no RNG: the same JSON always produces the same ranking, and
+  reordering the file by hand cannot change it.
+- **`mechanical_filters.py`** — the SMA20/50/200 stack, liquidity, ATR-band,
+  extension, gap and spread gates, plus risk-based position sizing. **Fails closed**:
+  any unknown is a rejection, never a pass.
+- **`scripts/build_watchlist.py`** — CLI that ties them together.
+- **`docs/STRATEGY_<date>.md`** — the deterministic playbook derived from a session.
+
+```bash
+python scripts/build_watchlist.py                       # rank only, offline
+python scripts/build_watchlist.py --live --top 20       # + mechanical gate on real bars
+python scripts/build_watchlist.py --watchlist-var       # emit a WATCHLIST repo-var line
+python scripts/build_watchlist.py --size 25000 1.5 84.30 82.10   # size one trade
+python tests/test_research_scan.py                      # 24 tests, no pytest needed
+```
+
+The division of responsibility is the point: **consensus scoring only ranks; the
+mechanical gate decides.** A name every chat source agrees on is still rejected if it
+lacks 200 sessions of history, because an SMA200 gate cannot evaluate what does not
+exist. Consensus across AI chats measures salience, not independent confirmation —
+those sessions read the same wire feeds — so its weight is concave and hard-capped.
+
+This layer is advisory only. It produces a watchlist; it places no orders. Feeding
+its output into live trading still goes through the `WATCHLIST` repo variable and the
+60-day trial gate below.
+
 ## 60-day trial
 
 The engine runs a fixed rollout before any live-trading decision:

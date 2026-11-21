@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 1 paper trading: 25 engine runs, zero trades, zero preconditions met</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --ink:#1a1714; --ink2:#4a423a; --ink3:#7d7366;
+  --paper:#f0ece6; --surface:#fffdfa; --line:#d8d1c7; --soft:#e7e1d8;
+  --accent:#a44a1f;
+  --pass:#2f6b43; --pass-bg:#e2eee6;
+  --warn:#8a6314; --warn-bg:#f6ecd6;
+  --fail:#9c2b22; --fail-bg:#f6e2df;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ink:#ece7e0; --ink2:#b3a99d; --ink3:#857a6d;
+  --paper:#15120f; --surface:#1e1a16; --line:#352f28; --soft:#262119;
+  --accent:#e08a5a;
+  --pass:#6cbd8b; --pass-bg:#16301f;
+  --warn:#d9a948; --warn-bg:#352709;
+  --fail:#e0847a; --fail-bg:#381915;
+}}
+:root[data-theme="dark"]{
+  --ink:#ece7e0; --ink2:#b3a99d; --ink3:#857a6d;
+  --paper:#15120f; --surface:#1e1a16; --line:#352f28; --soft:#262119;
+  --accent:#e08a5a;
+  --pass:#6cbd8b; --pass-bg:#16301f;
+  --warn:#d9a948; --warn-bg:#352709;
+  --fail:#e0847a; --fail-bg:#381915;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:900px;margin:0 auto;padding:30px 20px 70px;display:flex;flex-direction:column;gap:32px}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.015em}
+h1{font-size:clamp(28px,5vw,40px);font-weight:700;line-height:1.1}
+h2{font-size:22px;font-weight:700}
+h3{font-size:16px;font-weight:600}
+p{margin:0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink3)}
+.prose{max-width:66ch;color:var(--ink2)}
+.why{font-size:13.5px;color:var(--ink2);margin-top:3px}
+header{border-bottom:2px solid var(--ink);padding-bottom:20px;display:flex;flex-direction:column;gap:12px}
+.verdict{padding:18px 20px;border-radius:4px;border-left:4px solid}
+.verdict.fail{background:var(--fail-bg);border-color:var(--fail)}
+.verdict.warn{background:var(--warn-bg);border-color:var(--warn)}
+.verdict.pass{background:var(--pass-bg);border-color:var(--pass)}
+.verdict .vt{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.verdict.fail .vt{color:var(--fail)} .verdict.warn .vt{color:var(--warn)} .verdict.pass .vt{color:var(--pass)}
+.verdict p{margin-top:7px;font-size:14.5px;color:var(--ink2);max-width:70ch}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.tiles div{background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.tiles dt{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink3)}
+.tiles dd{margin:0;font-family:var(--mono);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.tiles dd small{font-size:12px;font-weight:500;color:var(--ink3)}
+section{display:flex;flex-direction:column;gap:15px}
+.shead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);padding-bottom:8px}
+.shead .eyebrow{margin-left:auto}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:420px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--soft);vertical-align:top}
+th{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink3);background:var(--paper)}
+tr:last-child td{border-bottom:none}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--ink3)}
+.chip{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.09em;
+  padding:3px 8px;border-radius:2px;white-space:nowrap;display:inline-block}
+.c-pass{background:var(--pass-bg);color:var(--pass)}
+.c-fail{background:var(--fail-bg);color:var(--fail)}
+ol.chain{margin:0;padding-left:0;list-style:none;counter-reset:s;
+  display:flex;flex-direction:column;gap:0}
+ol.chain li{counter-increment:s;position:relative;padding:0 0 18px 34px;
+  border-left:2px solid var(--line);margin-left:11px}
+ol.chain li:last-child{border-left-color:transparent;padding-bottom:0}
+ol.chain li::before{content:counter(s);position:absolute;left:-12px;top:0;
+  width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--surface);
+  font-family:var(--mono);font-size:11px;font-weight:700;display:grid;place-items:center}
+pre.ev{font-family:var(--mono);font-size:12px;background:var(--paper);border:1px solid var(--soft);
+  border-radius:3px;padding:9px 11px;margin:8px 0 0;overflow-x:auto;color:var(--ink2);white-space:pre-wrap}
+ol.fixes{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:12px}
+ol.fixes li::marker{font-family:var(--mono);font-weight:700;color:var(--accent)}
+details{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0}
+details summary{padding:11px 15px;cursor:pointer;font-weight:600;font-size:14px}
+details summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+details[open] summary{border-bottom:1px solid var(--soft)}
+details .body{padding:14px 15px}
+footer{border-top:1px solid var(--line);padding-top:18px;color:var(--ink3);font-size:13px;
+  display:flex;flex-direction:column;gap:9px;max-width:72ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">QuantScout-Cloud &middot; paper-trading weekly &middot; week 1</p>
+  <h1>Week 1 paper trading: 25 engine runs, zero trades, zero preconditions met</h1>
+  <p class="prose">Window <span class="mono">2026-11-14 to 2026-11-20 (UTC, 7 full days)</span> &middot; generated <span class="mono">2026-11-21 02:06 UTC</span></p>
+</header>
+
+<div class="verdict fail">
+  <div class="vt">NO PAPER TRADING OCCURRED</div>
+  <p>Week 1 of paper trading has not happened. The scheduler fired 25 times in this window (440 all time) and every run completed successfully, but no run fetched a price, computed an indicator, produced a signal, placed an order, or recorded a decision. Every one of the 11 secrets and variables reaches the engine empty, which pins the trial phase to DRY_RUN and makes an order impossible on two independent gates. The zero in 'orders placed' is a plumbing outage, not a flat strategy week -- and because the engine's own log was never persisted, there is no trading history to evaluate.</p>
+</div>
+
+<dl class="tiles">
+  <div><dt>Orders placed</dt><dd>0</dd></div>
+  <div><dt>Signals fired</dt><dd>0</dd></div>
+  <div><dt>Decisions logged</dt><dd>0</dd></div>
+  <div><dt>Preconditions met</dt><dd>1<small> / 9</small></dd></div>
+  <div><dt>Engine runs (week)</dt><dd>25</dd></div>
+  <div><dt>Runs all time</dt><dd>440</dd></div>
+  <div><dt>Trial phase</dt><dd style="font-size:15px">DRY_RUN</dd></div>
+</dl>
+
+<section>
+  <div class="shead"><h2>Why nothing traded</h2><span class="eyebrow">root cause first</span></div>
+  <p class="prose">First failing precondition: <b>Broker credentials present</b>. Everything below it is
+  downstream of that, so fixing lower items alone changes nothing.</p>
+  <ol class="chain"><li><b>Every secret and variable reaches the engine empty</b><div class="why">The Actions env block echoes each one with nothing after the colon. ENABLE_TRADING being empty is the one that looks harmless and is not: run_scan._env_bool falls back to True, so the engine believes trading is enabled while having no way to trade.</div><pre class="ev">ALPACA_ID:
+ALPACA_SECRET:
+POLYGON_KEY:
+TIINGO_KEY:
+TRIAL_GITHUB_TOKEN:
+WATCHLIST:
+ENABLE_TRADING:
+NOTIONAL_PER_TRADE:
+MAX_POSITIONS:</pre></li><li><b>No price source can answer, so price is always None</b><div class="why">Both fetchers short-circuit on the missing key before any network call. Executed directly against engine.py from origin/main:</div><pre class="ev">fetch_alpaca_price('AEHR','','')  -&gt; (None, 'No Keys')
+fetch_polygon_price('AEHR','')    -&gt; (None, 'No Key')</pre></li><li><b>The indicator fallback is rate-limited on every ticker</b><div class="why">With no Alpaca keys, fetch_indicators_hybrid falls through to yfinance and is throttled. The 43 errors per run match engine.DEFAULT_TICKERS exactly -- 43 tickers, 43 refusals -- which also confirms WATCHLIST being empty means the built-in list is what runs.</div><pre class="ev">HTTP Error 429: Too Many Requests        x43 per run
+len(engine.DEFAULT_TICKERS) == 43</pre></li><li><b>decide() therefore returns HOLD unconditionally</b><div class="why">The function's first guard is `if price and rsi &gt; 0`. price is None, so the guard never opens and no branch is reachable. This is not the strategy being cautious -- it is the strategy never being consulted.</div><pre class="ev">decide(None, 0.0, 0.0, 0.0)      -&gt; ('HOLD', 0.0)   # observed every run
+decide(100.0, 95.0, 55.0, 0.40) -&gt; ('BUY', 0.84)    # same code, healthy inputs</pre></li><li><b>The trial phase is pinned to DRY_RUN permanently</b><div class="why">Without TRIAL_GITHUB_TOKEN, get_trial_start_date() returns None, and get_trial_phase(None) returns DRY_RUN with no day counter. The 60-day clock has never started, which is why the log reads 'day None'. Day 31 -- when PAPER would begin -- is unreachable, not merely distant.</div><pre class="ev">Phase: DRY_RUN (day None) — started None
+get_trial_phase(None) -&gt; ('DRY_RUN', None)</pre></li><li><b>Opening a position is impossible even if a signal fired</b><div class="why">Two independent gates both fail: no broker credentials, and the wrong phase. Either one alone is sufficient to block every order.</div><pre class="ev">trading_base_ready = enable_trading AND alpaca_id AND alpaca_secret  -&gt; False
+can_open_new       = trading_base_ready AND phase == 'PAPER'         -&gt; False
+can_close          = trading_base_ready AND phase in (PAPER,REVIEW) -&gt; False</pre></li><li><b>And nothing was recorded, so there is no history to analyse</b><div class="why">Each run reports zero new log entries, and the branch the log would live on does not exist. 440 runs of state were computed and discarded. This report had to be reconstructed from Actions logs because the engine's own audit trail is empty.</div><pre class="ev">0 new trial-log entries this pass
+Open positions/simulated holds: []
+git ls-remote --heads origin bot-trial-log  -&gt;  (no such branch)
+no trial_state/ path exists on any of the 9 remote branches</pre></li></ol>
+</section>
+
+<section>
+  <div class="shead"><h2>Precondition audit</h2><span class="eyebrow">1 of 9 met</span></div>
+  <p class="prose">All of these must hold before a single paper order is possible. They are
+  listed in the order the engine evaluates them.</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>#</th><th>State</th><th>Gate</th></tr></thead>
+    <tbody><tr><td class="n">1</td><td><span class="chip c-pass">PASS</span></td><td><b>Scheduler fires</b><div class="why">GitHub Actions ran the workflow on its cron</div></td></tr><tr><td class="n">2</td><td><span class="chip c-fail">BLOCKED</span></td><td><b>Broker credentials present</b><div class="why">engine.run_scan: trading_base_ready = enable_trading AND alpaca_id AND alpaca_secret</div></td></tr><tr><td class="n">3</td><td><span class="chip c-fail">BLOCKED</span></td><td><b>A price source answers</b><div class="why">fetch_alpaca_price then fetch_polygon_price; both return None without keys</div></td></tr><tr><td class="n">4</td><td><span class="chip c-fail">BLOCKED</span></td><td><b>Indicators computable</b><div class="why">fetch_indicators_hybrid needs &gt;20 daily bars; HTTP 429 means the fallback was throttled</div></td></tr><tr><td class="n">5</td><td><span class="chip c-fail">BLOCKED</span></td><td><b>A signal can fire</b><div class="why">decide() requires `price and rsi &gt; 0`; with price=None it returns HOLD unconditionally</div></td></tr><tr><td class="n">6</td><td><span class="chip c-fail">BLOCKED</span></td><td><b>Trial clock persists</b><div class="why">get_trial_start_date returns None without a token, so get_trial_phase(None) -&gt; DRY_RUN</div></td></tr><tr><td class="n">7</td><td><span class="chip c-fail">BLOCKED</span></td><td><b>Phase allows opening a position</b><div class="why">can_open_new = trading_base_ready AND phase == 'PAPER'</div></td></tr><tr><td class="n">8</td><td><span class="chip c-fail">BLOCKED</span></td><td><b>Decisions are recorded</b><div class="why">trial_state/trial_log.jsonl on the bot-trial-log branch</div></td></tr><tr><td class="n">9</td><td><span class="chip c-fail">BLOCKED</span></td><td><b>Paper account is the order target</b><div class="why">engine.ALPACA_TRADE_BASE is hardcoded to paper-api.alpaca.markets</div></td></tr></tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="shead"><h2>Configuration</h2><span class="eyebrow">from the Actions env block</span></div>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Secret / variable</th><th>State</th><th>Consequence when empty</th></tr></thead>
+    <tbody><tr><td class="mono">ALPACA_ID</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">no broker connection; fetch_alpaca_price returns 'No Keys'</td></tr><tr><td class="mono">ALPACA_SECRET</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">no broker connection; trading_base_ready stays False</td></tr><tr><td class="mono">POLYGON_KEY</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">price fallback dead; fetch_polygon_price returns 'No Key'</td></tr><tr><td class="mono">TIINGO_KEY</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">sentiment falls through to GoogleNews, then yfinance</td></tr><tr><td class="mono">TRIAL_GITHUB_TOKEN</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">trial clock cannot persist; phase pinned to DRY_RUN forever</td></tr><tr><td class="mono">TG_TOKEN</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">no Telegram alerts (cosmetic)</td></tr><tr><td class="mono">TG_ID</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">no Telegram alerts (cosmetic)</td></tr><tr><td class="mono">WATCHLIST</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">falls back to engine.DEFAULT_TICKERS</td></tr><tr><td class="mono">ENABLE_TRADING</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">defaults True, but inert while keys are missing</td></tr><tr><td class="mono">NOTIONAL_PER_TRADE</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">defaults to $500</td></tr><tr><td class="mono">MAX_POSITIONS</td><td><span class="chip c-fail">EMPTY</span></td><td class="why">defaults to 8</td></tr></tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="shead"><h2>Scheduler telemetry</h2><span class="eyebrow">execution record</span></div>
+  <p class="prose">Cron asks for <b>96 runs/day (cron */15 * * * *)</b>. Observed 25 runs across 7 days -- about 3.6/day, roughly 3.7% of the requested cadence. GitHub throttles high-frequency schedules on shared runners, so the */15 cron is not a real every-15-minutes loop and never was.</p>
+  <details>
+    <summary>Runs per day this window</summary>
+    <div class="body"><div class="tblwrap"><table>
+      <thead><tr><th>Date (UTC)</th><th>Runs</th></tr></thead>
+      <tbody><tr><td class="mono">2026-11-20</td><td class="n mono">3</td></tr><tr><td class="mono">2026-11-19</td><td class="n mono">4</td></tr><tr><td class="mono">2026-11-18</td><td class="n mono">3</td></tr><tr><td class="mono">2026-11-17</td><td class="n mono">3</td></tr><tr><td class="mono">2026-11-16</td><td class="n mono">3</td></tr><tr><td class="mono">2026-11-15</td><td class="n mono">4</td></tr><tr><td class="mono">2026-11-14</td><td class="n mono">5</td></tr></tbody>
+    </table></div></div>
+  </details>
+</section>
+
+<section>
+  <div class="shead"><h2>What to fix, in order</h2><span class="eyebrow">to start week 1 for real</span></div>
+  <ol class="fixes"><li><b>Make a dead run fail instead of reporting success</b><div class="why">This is the real finding: 440 consecutive green runs concealed a total outage. Add an assertion at the end of run_scan.py -- if zero tickers produced a usable price, exit non-zero. A red workflow would have surfaced this on day one instead of week eleven. Do this first, because it is what protects every fix below.</div></li><li><b>Set ALPACA_ID and ALPACA_SECRET to the PAPER account keys</b><div class="why">Repo Settings -&gt; Secrets and variables -&gt; Actions. Paper keys only; live keys return 401 against the hardcoded paper endpoint, which is the intended safety behaviour. This unblocks both the price source and trading_base_ready.</div></li><li><b>Set TRIAL_LOG_TOKEN so the trial clock can start</b><div class="why">A fine-grained PAT scoped to this repo with Contents: Read and write. The engine reads it as TRIAL_GITHUB_TOKEN. On the first run with it set, get_trial_start_date() bootstraps today's date, creates the bot-trial-log branch, and the 60-day clock begins -- 30 days DRY_RUN, then PAPER. Until this exists, no amount of other configuration starts paper trading.</div></li><li><b>Give the indicator path a data source that is not rate-limited</b><div class="why">Set POLYGON_KEY and TIINGO_KEY, or have fetch_indicators_hybrid use the Alpaca bars endpoint once keys exist. 43 HTTP 429s per run means the free fallback is exhausted before it returns a single bar, so even with broker keys the RSI/SMA path needs its own fix.</div></li><li><b>Replace the */15 cron with a schedule GitHub will actually honour</b><div class="why">The requested 96 runs/day is delivering about 3.6. Pick an explicit market-hours schedule (e.g. every 30 minutes, 13:30-20:00 UTC, weekdays) so the cadence is predictable and the engine is not firing at 01:50 UTC when the market is shut.</div></li><li><b>Set WATCHLIST, NOTIONAL_PER_TRADE and MAX_POSITIONS explicitly</b><div class="why">All three are currently empty and running on code defaults (DEFAULT_TICKERS, $500, 8 positions). Defaults are fine as behaviour but invisible as configuration -- set them so the deployed values are stated rather than inferred.</div></li></ol>
+</section>
+
+<footer>
+  <p><b>Scope.</b> Every figure above is read from the GitHub Actions run list, the job logs
+  those runs printed, and the repository's branches. Nothing is estimated. A value that could
+  not be read renders as "unknown" rather than zero.</p>
+  <p><b>Broker accounts.</b> The engine holds no broker credentials at all, so it has never connected to any account; its order endpoint is hardcoded to paper-api.alpaca.markets. Separately, the only Alpaca account reachable from the session that produced this report is a LIVE account (equity $9,368.67 as of 2026-11-19, holding one position: 19 INTU at an average entry of $289.81, marked at $273.15 for -$316.47 / -5.75%). That position is not on the bot's watchlist and was not opened by the bot. It is named here only to be explicit that no live figure anywhere in this report is bot activity, and that the bot's paper results are empty rather than hidden.</p>
+  <p>Not investment advice. The engine's order endpoint is hardcoded to Alpaca's paper API
+  (<span class="mono">paper-api.alpaca.markets</span>); this report never places or modifies an order.</p>
+</footer>
+</div>
+</body>
+</html>
