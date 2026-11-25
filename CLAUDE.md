@@ -60,6 +60,7 @@ Python 3.11 (CI, `.github/workflows/desk-tests.yml`). No linter config. Dependen
 - **Storage** (`recovery/store.py`): `DriveStore` (OAuth refresh token, `drive.file` scope, `Recovery_Desk_Cloud` folder) or `LocalStore`. Every persisted JSON goes through `desk.dump_signed` / `load_signed` (HMAC, `RECOVERY_SNAPSHOT_KEY`); new files must too.
 - **Dashboard** (`recovery_app.py`): read-only over signed files. Its only write is the Robinhood upload (signed `held.json` with per-name Cap/Mom book). Refresh dispatches the backup workflow. Read secrets via `_secret()`.
 - **Deployment**: `deploy/create_vm_gcloud.sh` (Cloud Shell) → `deploy/setup_vm.sh` → hardened `deploy/recovery-desk.service`; `Dockerfile` is the alternative.
+- **`tools/`**: standalone helpers for the owner's other bots (e.g. `orb_vwap_weekly_report.py`, a weekly HTML report for the separate ORB/VWAP paper bot). They import nothing from `recovery/`; keep it that way. Their outputs name tickers: never commit them.
 
 ## Project conventions
 - Configurable numbers live in `RuleConfig` or env vars; no magic numbers in code.

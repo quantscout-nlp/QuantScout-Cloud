@@ -25,6 +25,14 @@ As of 2026-11-25. Update this file whenever a setup step or phase completes. No 
 | 5. Always-on e2-micro worker | After the dashboard |
 | Webull / Massive / Tiingo keys | Optional, later |
 
+## Other bot: ORB / VWAP-pullback paper reports
+
+- `tools/orb_vwap_weekly_report.py` (standard library only) builds the same kind of weekly HTML page for the separate intraday ORB / VWAP-pullback paper bot, from its `post_session_summary_YYYY-MM-DD.html` pages. It shares no code with the desk.
+- Reports made 2026-11-25: start week (Oct 29–30, 2 sessions) and week 1 (Nov 2–6, 4 of 5 sessions; Nov 3 summary missing though equity shows a session).
+- Limits of the source: summaries list orders sent (entry, stop, target), not exits or fills, so there is no per-trade result; P/L is the daily day-change line.
+- Open: where that bot runs (to schedule the report there) and whether its trade log or fills can feed per-trade results. Its summaries say "Sized on $100k spec" while the paper account holds about $1M: confirm that is intended.
+- Generated reports name tickers and account figures: keep them out of this public repo.
+
 ## Decisions
 
 - **RVOL20 basis:** SIP regular hours first, Webull regular hours as fallback, one source per ratio (rulebook v1.6.2, locked 2026-10-22 15:05 ET).
