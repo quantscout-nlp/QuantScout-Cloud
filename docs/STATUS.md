@@ -21,8 +21,8 @@ As of 2026-11-25. Update this file whenever a setup step or phase completes. No 
 | 2. Google connection: Drive API, consent screen published to production, desktop client, token script run | Done |
 | 3. GitHub Environment `recovery-desk` with the `DESK_*` secrets and `DESK_RVOL_BASIS=SIP` | Still not visible to the workflow: all 46 runs (2026-10-26 to 2026-11-25), including two forced runs after the owner reported the secrets fixed, saw every secret and variable empty and refused to run. Recheck names and environment |
 | 4. Merge PR #6, then Actions → Recovery Desk failover → Run workflow (force = true) | Merged 2026-10-26. First forced run refused safely (no Drive folder ID); rerun after step 3 is fixed |
-| 6. Streamlit dashboard from this branch, private | Next, after the first good run |
-| 5. Always-on e2-micro worker | After the dashboard |
+| 5. Always-on e2-micro worker | **In progress (owner, 2026-11-25), now the primary route.** Walkthrough given: Cloud Shell → `create_vm_gcloud.sh` → fill `/etc/recovery-desk.env` → one forced test cycle (docs §7 step 5) → enable `recovery-desk` and `recovery-desk-weekly.timer`. Next: read the owner's test-cycle output and fix whatever the first live run turns up |
+| 6. Streamlit dashboard from this branch, private | After the first good VM cycle |
 | Webull / Massive / Tiingo keys | Optional, later |
 
 ## Other bot: ORB / VWAP-pullback paper reports
@@ -37,6 +37,7 @@ As of 2026-11-25. Update this file whenever a setup step or phase completes. No 
 
 - **RVOL20 basis:** SIP regular hours first, Webull regular hours as fallback, one source per ratio (rulebook v1.6.2, locked 2026-10-22 15:05 ET).
 - **Hosting:** the always-on worker is primary; the GitHub schedule is the backup and stands down while the worker is fresh.
+- **Go-live route (2026-11-25):** the VM goes first because it reads keys from its own `/etc/recovery-desk.env`, not from GitHub. The GitHub secrets problem is fixed later from screenshots of Settings → Environments (names only).
 - **Isolation:** the desk shares no code or secrets with the QuantScout engine on `main`; its only file there is the backup workflow.
 - **Robinhood:** read-only CSV upload (no official API); held names outside the universe are scanned for stops but never join the watchlist.
 - **Merge order:** PR #6 is merged only after the step 3 secrets exist, or every scheduled run fails.
@@ -45,6 +46,9 @@ As of 2026-11-25. Update this file whenever a setup step or phase completes. No 
 - **AI models:** stay off the decision path; planned uses are research, engineering, a daily briefing and a weekly audit (Phase 3).
 
 ## Open items
+
+- First live cycle on the VM: expect small fixes. Holiday week: Thu 2026-11-26 closed, Fri 2026-11-27 closes 13:00 (the Alpaca calendar handles both). The first weekly report with real data is Sat 2026-11-28.
+- GitHub secrets: still blank in all 46 runs after two "fixed" reports. Needs screenshots of Settings → Environments and the `recovery-desk` page.
 
 - Fix step 3: every backup run fails while the secrets are missing (46 of 46 so far). The desk has never published a snapshot.
 - GitHub fires the every-5-minutes schedule only about twice a day, so the backup cannot keep the desk current on its own; the always-on worker (step 5) is required.

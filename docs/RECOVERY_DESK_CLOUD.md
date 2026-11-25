@@ -114,6 +114,12 @@ These block a paper candidate: a non-session day, a stale feed, and the wash-sal
 
    It creates the VM (e2-micro, Debian 12, 30 GB standard disk, us-east1-b, no service account, Shielded VM, OS Login) and runs `deploy/setup_vm.sh` on it. Then SSH in, fill `/etc/recovery-desk.env` (names in the table below), and run `sudo systemctl enable --now recovery-desk recovery-desk-weekly.timer` (the worker, plus the Saturday weekly report).
 
+   **First test before enabling it:** on the VM, run one forced cycle and read its output (counts and health only, never keys or tickers). It works at any hour; outside market hours it builds the list from the last close and writes `latest.json` to the Drive folder.
+
+   ```
+   sudo -u desk bash -c 'set -a; . /etc/recovery-desk.env; set +a; cd /opt/recovery-desk/app && RECOVERY_FORCE=1 /opt/recovery-desk/venv/bin/python scripts/run_recovery_desk.py'
+   ```
+
    Free-tier limits: 1 e2-micro, 30 GB standard disk and 1 GB of outbound traffic a month (North America), in us-east1, us-central1 or us-west1 only. Google may bill the VM's external IPv4 address (about $0.005/hour, roughly $3.65/month). Check the first invoice and set a budget alert (Billing → Budgets & alerts, for example $5).
 6. **Dashboard.** In Streamlit Community Cloud, create a new app: repo `quantscout-nlp/QuantScout-Cloud`, branch `recovery-desk`, file `recovery_app.py`.
    - Secrets: the Google values, `RECOVERY_DRIVE_FOLDER_ID`, and `RECOVERY_SNAPSHOT_KEY`.
