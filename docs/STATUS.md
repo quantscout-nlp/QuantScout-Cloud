@@ -19,7 +19,7 @@ As of 2026-11-25. Update this file whenever a setup step or phase completes. No 
 |---|---|
 | 1. Alpaca paper keys for the desk | Done |
 | 2. Google connection: Drive API, consent screen published to production, desktop client, token script run | Done |
-| 3. GitHub Environment `recovery-desk` with the `DESK_*` secrets and `DESK_RVOL_BASIS=SIP` | Still not visible to the workflow: all 45 runs (2026-10-26 to 2026-11-25), including a forced run after the owner reported the secrets fixed, saw every secret and variable empty and refused to run. Recheck names and environment |
+| 3. GitHub Environment `recovery-desk` with the `DESK_*` secrets and `DESK_RVOL_BASIS=SIP` | Still not visible to the workflow: all 46 runs (2026-10-26 to 2026-11-25), including two forced runs after the owner reported the secrets fixed, saw every secret and variable empty and refused to run. Recheck names and environment |
 | 4. Merge PR #6, then Actions → Recovery Desk failover → Run workflow (force = true) | Merged 2026-10-26. First forced run refused safely (no Drive folder ID); rerun after step 3 is fixed |
 | 6. Streamlit dashboard from this branch, private | Next, after the first good run |
 | 5. Always-on e2-micro worker | After the dashboard |
@@ -46,7 +46,7 @@ As of 2026-11-25. Update this file whenever a setup step or phase completes. No 
 
 ## Open items
 
-- Fix step 3: every backup run fails while the secrets are missing (45 of 45 so far). The desk has never published a snapshot.
+- Fix step 3: every backup run fails while the secrets are missing (46 of 46 so far). The desk has never published a snapshot.
 - GitHub fires the every-5-minutes schedule only about twice a day, so the backup cannot keep the desk current on its own; the always-on worker (step 5) is required.
 - The pinned checkout and setup-python actions target Node.js 20, which GitHub now forces onto Node.js 24 (warning only). Move to releases built for Node.js 24 at the next workflow change.
 
