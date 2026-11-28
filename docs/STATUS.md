@@ -1,6 +1,6 @@
 # Recovery Desk — project status
 
-As of 2026-11-25. Update this file whenever a setup step or phase completes. No secrets, account identifiers or tickers belong here: the repository is public.
+As of 2026-11-28. Update this file whenever a setup step or phase completes. No secrets, account identifiers or tickers belong here: the repository is public.
 
 ## Built (on this branch, 39 tests green in CI)
 
@@ -47,6 +47,7 @@ As of 2026-11-25. Update this file whenever a setup step or phase completes. No 
 
 ## Open items
 
+- 2026-11-28: owner reports the VM is set up; no test-cycle output received yet and no desk files visible in Drive. Next: owner runs the one-cycle test (docs §7 step 5) and pastes its output.
 - First live cycle on the VM: expect small fixes. Holiday week: Thu 2026-11-26 closed, Fri 2026-11-27 closes 13:00 (the Alpaca calendar handles both). The first weekly report with real data is Sat 2026-11-28.
 - GitHub secrets: still blank in all 46 runs after two "fixed" reports. Needs screenshots of Settings → Environments and the `recovery-desk` page.
 
